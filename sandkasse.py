@@ -8,6 +8,9 @@ from keras.layers import Dense, LeakyReLU
 
 activation = LeakyReLU(alpha=0.01)
 
+## PENIS
+
+
 model = Sequential()
 model.add(Dense(128, input_shape=(784,), activation=activation))
 model.add(Dense(48, activation = activation))
