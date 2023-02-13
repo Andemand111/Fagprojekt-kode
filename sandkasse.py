@@ -1,3 +1,5 @@
+## encodings til mnist
+
 from keras.datasets import mnist
 import matplotlib.pyplot as plt
 import numpy as np
