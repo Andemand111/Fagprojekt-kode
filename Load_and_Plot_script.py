@@ -1,6 +1,3 @@
-import pandas as pd
-pd.set_option('display.max_rows', 500)
-pd.set_option('display.max_columns', 300)
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -14,12 +11,17 @@ import os
 os.chdir("C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/Data/singlecell/singh_cp_pipeline_singlecell_images/B02_s1_w1B1A7ADEA-8896-4C7D-8C63-663265374B72")
 
 
-# Open a file
+# Set a filepath
 path = "C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/Data/singlecell/singh_cp_pipeline_singlecell_images/B02_s1_w1B1A7ADEA-8896-4C7D-8C63-663265374B72"
 dirs = os.listdir( path )
+path2 = "C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/Data/singlecell/singh_cp_pipeline_singlecell_images"
+topfolder = os.listdir( path2 )
 
-# Load all files from 1 folder
+# Load files into array and normalize
 arrays = []
+
+""""Uncomment this to load ALL folders"""
+#for folder in topfolder:
 for filename in dirs:
     flatfile = np.load(filename).flatten()
     arrays.append(list(flatfile/np.max(flatfile)))
