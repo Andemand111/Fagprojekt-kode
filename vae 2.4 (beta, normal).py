@@ -12,7 +12,7 @@ batch_size = 128
 num_epochs = 100
 learning_rate = 0.001
 latent_size = 800
-beta = 1.5
+beta = 1
 
 #%%
 
@@ -88,6 +88,7 @@ class VAE(torch.nn.Module):
 
     def forward(self, state):
         q_z = self.encoder(state)
+        # Parameterization trick
         z = q_z.rsample()
         return self.decoder(z), q_z
     
@@ -173,6 +174,7 @@ for i, ax in enumerate(axs.flatten()):
 
 #%%
 
+
 fig, axs = plt.subplots(3,3,subplot_kw={'xticks': [], 'yticks': []})
 for ax in axs.flatten():
     random_z = 4 * torch.randn((1,latent_size))
@@ -183,6 +185,8 @@ plt.savefig("results from normal")
     
     #%%
 
+# Plot function:
+# Side-by-Side, original vs. reconstructed
 for i in range(5):
     fig, axs = plt.subplots(2)
     idx = np.random.randint(len(train_data))
