@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.datasets import fetch_lfw_people
 from torch.utils.data import Dataset
 import torch.nn as nn
+
 # Definerer variable
 input_dim = 62 * 47 * 3
 batch_size = 128
@@ -13,7 +14,7 @@ num_epochs = 100
 learning_rate = 0.001
 latent_size = 300
 beta = 0.1
-delta_beta  = 0.002
+delta_beta  = 0.002   ## ændringen i beta-værdi for hver epoch
 eps = 1e-6
 alpha = 0.3
 
