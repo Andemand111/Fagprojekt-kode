@@ -7,7 +7,13 @@ from sklearn.datasets import fetch_lfw_people
 from torch.utils.data import Dataset
 import torch.nn as nn
 
+<<<<<<< HEAD
 # Definerer variable
+=======
+# Definerer variable sddgoijhsdoighsdiufhgdifuhgiudfhgiuhd
+# test1
+#test 2
+>>>>>>> fb37fee534638842ace5b2adc2e26215c52b3a16
 input_dim = 62 * 47 * 3
 batch_size = 128
 num_epochs = 100
