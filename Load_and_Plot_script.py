@@ -91,16 +91,22 @@ showim(meanpic, brighten = True)
 
 #%% 
 """Summary statistics """ 
-channel_len = int(data.shape[1]/3)
 
 dadler = data.reshape(-1,3)
 RGBstd = np.std(dadler,axis=0)
 
-### Standard Deviations
+
+### Color Standard Deviations
 # stdR = 2388.3 , stdG = 3638.45, stdB = 1912.5
 
 #%%
-lst = np.arange(2700)
-print(f'arange: {lst}')
-picex= lst.reshape(-1,30,30,3)
-print(f'reshaped: {picex}')
+
+### Color Means
+RGBmeans = np.mean(dadler,axis=0)
+# meanR = 2420.41 , meanG = 5670.9 , meanB = 2995.11
+#%%
+### Color min max
+RGBmin, RGBmax = np.min(dadler,axis=0),np.max(dadler,axis=0)
+print(RGBmin,RGBmax)
+
+
