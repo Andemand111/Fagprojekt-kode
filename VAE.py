@@ -17,6 +17,7 @@ beta = 0.1
 delta_beta  = 0.002   ## ændringen i beta-værdi for hver epoch
 eps = 1e-6
 alpha = 0.3
+name_of_model = "beta_bce"
 
 class Faces(Dataset):
     """Scikit-Learn Digits dataset."""
@@ -129,8 +130,6 @@ decoder = Decoder(decoder_network)
 
 vae = VAE(encoder, decoder)
 
-# %%
-
 stats = np.zeros((num_epochs, 4))
 random_z = torch.randn((1, latent_size))
 random_face = train_data[np.random.randint(len(train_data))]
@@ -182,20 +181,17 @@ for epoch in range(num_epochs):
         ax.plot(stats[:epoch, i+1])
     plt.show()
 
-np.save("betabce", stats)
-torch.save(vae.state_dict(), "betabce")
+np.save(name_of_model, stats)
+torch.save(vae.state_dict(), name_of_model)
 
-# %%
+#%%
 
 ## Eventuelt hent model her
-
 encoder = Encoder(encoder_network)
 decoder = Decoder(decoder_network)
 vae = VAE(encoder, decoder)
 vae.load_state_dict(torch.load("betabce"))
 
-
-# %%
 
 random_zs = torch.randn((10, latent_size))
 for z in random_zs:
@@ -203,7 +199,6 @@ for z in random_zs:
     plt.imshow(x_hat.reshape(62, 47, 3))
     plt.show()
 
-# %%
 
 random_faces = train_data[np.random.randint(len(train_data), size=10)]
 for face in random_faces:
@@ -214,7 +209,7 @@ for face in random_faces:
     plt.imshow(decoding.reshape(62, 47, 3))
     plt.show()
 
-# %%
+
 idx = np.random.randint(len(train_data))
 random_face = train_data[idx]
 encoding = vae.encode(torch.tensor(random_face))
