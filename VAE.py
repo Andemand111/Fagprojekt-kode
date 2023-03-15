@@ -85,10 +85,12 @@ class VAE(torch.nn.Module):
     def encode(self, x):
         mu, log_var, log_spike = self.encoder(x)
         
-        ## samplet et z
+        ## Metode 1) sampler et z fra z-fordelingen
         # z = self.reparameterization(mu, log_var, log_spike)
         
-        ## måske en mere rigtig måde at gøre det
+        
+        ## Metode 2) tager mu, "gennemsnittet" fra z-fordelingen
+        ##      -> er nok den mest korrekte måde at gøre det på
         spike = log_spike.exp()
         selection = torch.sigmoid(50 * (spike - 1))
         z = selection.mul(mu)
