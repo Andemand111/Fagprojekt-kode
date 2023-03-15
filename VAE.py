@@ -9,6 +9,7 @@ import torch.nn as nn
 
 # Definerer variable sddgoijhsdoighsdiufhgdifuhgiudfhgiuhd
 # test1
+#test 2
 input_dim = 62 * 47 * 3
 batch_size = 128
 num_epochs = 100
