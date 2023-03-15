@@ -114,10 +114,7 @@ decoder_network = nn.Sequential(
     nn.Linear(latent_size, 2048),
     nn.ReLU(),
     nn.Linear(2048, 8192),
-    nn.ReLU(),
-    nn.Linear(8192, input_dim),
-    nn.Sigmoid()
-)
+    nn.ReLU()
 
 dataloader = torch.utils.data.DataLoader(
     train_data, batch_size=batch_size,
