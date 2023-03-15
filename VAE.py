@@ -14,10 +14,11 @@ num_epochs = 100
 learning_rate = 0.001
 latent_size = 300
 beta = 0.1
-delta_beta  = 0.002   ## ændringen i beta-værdi for hver epoch
+delta_beta = 0.002  # ændringen i beta-værdi for hver epoch
 eps = 1e-6
 alpha = 0.3
 name_of_model = "beta_bce"
+
 
 class Faces(Dataset):
     """Scikit-Learn Digits dataset."""
@@ -42,13 +43,14 @@ class Encoder(torch.nn.Module):
     def __init__(self, network):
         super(Encoder, self).__init__()
         self.network = network
-        
+
     def forward(self, x):
         x_reshaped = x.view(-1, 62, 47, 3).permute(0, 3, 1, 2)
         z = self.network(x_reshaped)
         mu, log_var, log_spike = torch.chunk(z, 3, 1)
         return mu, log_var, log_spike
-    
+
+
 class Decoder(torch.nn.Module):
     def __init__(self, network):
         super(Decoder, self).__init__()
@@ -64,13 +66,13 @@ class VAE(torch.nn.Module):
         super(VAE, self).__init__()
         self.encoder = encoder
         self.decoder = decoder
-    
+
     def reparameterization(self, mu, log_var, log_spike):
         std = torch.exp(0.5 * log_var)
         eps_ = torch.randn_like(std)
         gaussian = eps_.mul(std).add_(mu)
         eta = torch.randn_like(std)
-        
+
         c = 50
         selection = torch.sigmoid(c * (eta + log_spike.exp() - 1))
         return selection.mul(gaussian)
@@ -79,27 +81,35 @@ class VAE(torch.nn.Module):
         mu, log_var, log_spike = self.encoder(x)
         z = self.reparameterization(mu, log_var, log_spike)
         x_hat = self.decoder(z)
-        
+
         return mu, log_var, log_spike, z, x_hat
 
     def encode(self, x):
         mu, log_var, log_spike = self.encoder(x)
-        
-        ## Metode 1) sampler et z fra z-fordelingen
+
+        # Metode 1) sampler et z fra z-fordelingen
         # z = self.reparameterization(mu, log_var, log_spike)
-        
-        
-        ## Metode 2) tager mu, "gennemsnittet" fra z-fordelingen
-        ##      -> er nok den mest korrekte måde at gøre det på
+
+        # Metode 2) tager mu, "gennemsnittet" fra z-fordelingen
+        # -> er nok den mest korrekte måde at gøre det på
         spike = log_spike.exp()
         selection = torch.sigmoid(50 * (spike - 1))
         z = selection.mul(mu)
-        
+
         return z.detach().numpy()
 
     def decode(self, z):
         x_hat = self.decoder(z)
         return x_hat.detach().numpy()
+
+
+class Reshape(nn.Module):
+    def forward(self, x):
+        return x.view(-1, 128, 8, 8)
+
+class Permute(nn.Module):
+    def forward(self, x):
+        return x.permute(0, 2, 3, 1)
 
 
 encoder_network = nn.Sequential(
@@ -118,9 +128,21 @@ decoder_network = nn.Sequential(
     nn.ReLU(),
     nn.Linear(2048, 8192),
     nn.ReLU(),
-    nn.Linear(8192, input_dim),
+    Reshape(),
+    nn.ConvTranspose2d(128, 64, (2, 2), stride=(2, 2), bias=True),
+    nn.ReLU(),
+    nn.ConvTranspose2d(64, 32, (2, 2), stride=(2, 2), bias=True),
+    nn.ReLU(),
+    nn.ConvTranspose2d(32, 3, (31, 16), stride=(1,1), bias=True),
+    Permute(),
+    nn.Flatten(),
     nn.Sigmoid()
 )
+
+z = torch.randn((2, latent_size))
+res = decoder_network(z)
+print(res.shape)
+
 
 dataloader = torch.utils.data.DataLoader(
     train_data, batch_size=batch_size,
@@ -136,6 +158,8 @@ stats = np.zeros((num_epochs, 4))
 random_z = torch.randn((1, latent_size))
 random_face = train_data[np.random.randint(len(train_data))]
 
+# %%
+
 optimizer = optim.Adam(vae.parameters(), lr=learning_rate)
 for epoch in range(num_epochs):
     for data in dataloader:
@@ -143,13 +167,14 @@ for epoch in range(num_epochs):
         inputs = inputs.view(-1, input_dim)
         optimizer.zero_grad()
         mu, log_var, log_spike, z, x_hat = vae(inputs)
-        
+
         Re = F.binary_cross_entropy(x_hat, inputs, reduction="sum")
-        
-        spike = torch.clamp(log_spike.exp(), eps, 1.0 - eps) 
+
+        spike = torch.clamp(log_spike.exp(), eps, 1.0 - eps)
         alpha = 0.3
 
-        prior1 = -0.5 * torch.sum(spike.mul(1 + log_var - mu.pow(2) - log_var.exp()))
+        prior1 = -0.5 * \
+            torch.sum(spike.mul(1 + log_var - mu.pow(2) - log_var.exp()))
         prior21 = (1 - spike).mul(torch.log((1 - spike) / (1 - alpha)))
         prior22 = spike.mul(torch.log(spike / alpha))
         prior2 = torch.sum(prior21 + prior22)
@@ -160,11 +185,11 @@ for epoch in range(num_epochs):
         optimizer.step()
 
     beta += delta_beta
-    
+
     curr_stats = [epoch, loss.item(), Re.item(), PRIOR.item()]
     stats[epoch+1, :] = curr_stats
     print(*curr_stats)
-            
+
     z_ = z[0].detach().numpy()
     plt.bar(np.arange(len(z_)), z_)
     plt.show()
@@ -186,9 +211,9 @@ for epoch in range(num_epochs):
 np.save(name_of_model, stats)
 torch.save(vae.state_dict(), name_of_model)
 
-#%%
+# %%
 
-## Eventuelt hent model her
+# Eventuelt hent model her
 encoder = Encoder(encoder_network)
 decoder = Decoder(decoder_network)
 vae = VAE(encoder, decoder)
