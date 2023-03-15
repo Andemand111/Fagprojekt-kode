@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.datasets import fetch_lfw_people
 from torch.utils.data import Dataset
 import torch.nn as nn
-
+# Definerer variable
 input_dim = 62 * 47 * 3
 batch_size = 128
 num_epochs = 100
