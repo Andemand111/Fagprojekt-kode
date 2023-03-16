@@ -10,7 +10,7 @@ import torch.nn as nn
 # Definerer variable
 input_dim = 62 * 47 * 3
 batch_size = 128
-num_epochs = 100
+num_epochs = 200
 learning_rate = 0.001
 latent_size = 300
 beta = 0.1
@@ -114,11 +114,11 @@ encoder_network = nn.Sequential(
 )
 
 decoder_network = nn.Sequential(
-    nn.Linear(latent_size, 2048),
+    nn.Linear(latent_size, 8192),
     nn.ReLU(),
-    nn.Linear(2048, 8192),
+    nn.Linear(8192, 16384),
     nn.ReLU(),
-    nn.Linear(8192, input_dim),
+    nn.Linear(16384, input_dim),
     nn.Sigmoid()
 )
 
@@ -164,10 +164,6 @@ for epoch in range(num_epochs):
     curr_stats = [epoch, loss.item(), Re.item(), PRIOR.item()]
     stats[epoch+1, :] = curr_stats
     print(*curr_stats)
-            
-    z_ = z[0].detach().numpy()
-    plt.bar(np.arange(len(z_)), z_)
-    plt.show()
 
     fig, ax = plt.subplots(1, 3)
     generation = vae.decode(random_z)
