@@ -6,7 +6,7 @@ from sklearn.datasets import fetch_lfw_people
 from torch.utils.data import Dataset
 import torchvision.transforms as T
 import torch.nn as nn
-from torch.distributions import kl_divergence, Normal
+from torch.distributions import kl_divergence, Normal, beta
 
 # Definerer variable
 batch_size = 128
@@ -163,19 +163,27 @@ stats = np.zeros((num_epochs, 4))
 # %%
 optimizer = optim.Adam(vae.parameters(), lr=learning_rate)
 for epoch in range(num_epochs):
-    beta = cyclical(epoch, 30, 0.8, 1)
+    kl_beta = cyclical(epoch, 30, 0.8, 1)
 
     for x in dataloader:
         optimizer.zero_grad()
         mu, log_var, x_hat = vae(x)
         std = torch.exp(0.5 * log_var)
+        
+        precision = 100
+        alfa_ = torch.clamp(precision * x, eps, 1-eps)
+        beta_ = torch.clamp(precision * (1 - x), eps, 1-eps)
+        distribution = beta.Beta(alfa_, beta_)
+        
+        log_probs = distribution.log_prob(torch.clamp(x_hat, eps, 1 - eps))
+        
+        Re = log_probs.sum(1).mean()
 
-        Re = torch.pow(x - x_hat, 2).sum(1).mean()
         kl = kl_divergence(
             Normal(0, 1),
             Normal(mu, std)).sum(1).mean()
 
-        loss = Re + beta * kl
+        loss = Re + kl_beta * kl
         loss.backward()
         optimizer.step()
 
