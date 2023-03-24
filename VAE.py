@@ -6,7 +6,7 @@ from sklearn.datasets import fetch_lfw_people
 from torch.utils.data import Dataset
 import torchvision.transforms as T
 import torch.nn as nn
-from torch.distributions import kl_divergence, Normal, beta
+from torch.distributions import kl_divergence, Normal, Beta
 
 # Definerer variable
 batch_size = 128
@@ -85,7 +85,7 @@ class VAE(torch.nn.Module):
         sampled_z = self.reparameterization(mu, log_var)
         x_hat = self.decoder(sampled_z)
 
-        return mu, log_var, x_hat
+        return mu, log_var, sampled_z, x_hat
 
     def encode_as_np(self, x):
         mu, log_var = self.encoder(x)
@@ -163,25 +163,27 @@ stats = np.zeros((num_epochs, 4))
 # %%
 optimizer = optim.Adam(vae.parameters(), lr=learning_rate)
 for epoch in range(num_epochs):
-    kl_beta = cyclical(epoch, 30, 0.8, 1)
+    kl_beta = cyclical(epoch, 30, 0.1, 0.2)
 
     for x in dataloader:
         optimizer.zero_grad()
-        mu, log_var, x_hat = vae(x)
+        mu, log_var, sampled_z, x_hat = vae(x)
         std = torch.exp(0.5 * log_var)
 
-        precision = 100
-        alfa_ = torch.clamp(precision * x, eps, 1-eps)
-        beta_ = torch.clamp(precision * (1 - x), eps, 1-eps)
-        distribution = beta.Beta(alfa_, beta_)
+        # Re = torch.pow(x - x_hat, 2).sum(1).mean()    ## negative, because we want to minimize
+        
+        precision = 50
+        alfa_ = torch.clamp(precision * x_hat, eps, 1-eps)
+        beta_ = torch.clamp(precision * (1 - x_hat), eps, 1-eps)
+        dist = Beta(alfa_, beta_)
+        log_probs = dist.log_prob(torch.clamp(x, eps, 1 - eps))
+        Re = - log_probs.sum(1).mean()
 
-        log_probs = distribution.log_prob(torch.clamp(x_hat, eps, 1 - eps))
-
-        Re = - log_probs.sum(1).mean()    ## negative, because we want to minimize
-
+        
         kl = kl_divergence(
-            Normal(0, 1),
-            Normal(mu, std)).sum(1).mean()
+            Normal(mu, std),
+            Normal(0, 1)
+            ).sum(1).mean()
 
         loss = Re + kl_beta * kl
         loss.backward()
@@ -190,7 +192,7 @@ for epoch in range(num_epochs):
     curr_stats = [epoch, loss.item(), Re.item(), kl.item()]
     stats[epoch, :] = curr_stats
 
-    print("Beta = ", beta)
+    print("Beta = ", kl_beta)
     print(*curr_stats, "\n")
 
     fig, axs = plt.subplots(3, 3)
