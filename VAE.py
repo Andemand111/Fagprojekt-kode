@@ -125,20 +125,20 @@ encoder_network = nn.Sequential(
     nn.LeakyReLU(),
 
     nn.Flatten(),
-    
+
     nn.Linear(4608, 2048),
     nn.LeakyReLU(),
-    
+
     nn.Linear(2048, 2 * latent_size)
 )
 
 decoder_network = nn.Sequential(
     nn.Linear(latent_size, 2048),
     nn.LeakyReLU(),
-    
+
     nn.Linear(2048, 8192),
     nn.LeakyReLU(),
-    
+
     nn.Linear(8192, 47*47*3),
     nn.Sigmoid()
 )
@@ -169,14 +169,14 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         mu, log_var, x_hat = vae(x)
         std = torch.exp(0.5 * log_var)
-        
+
         precision = 100
         alfa_ = torch.clamp(precision * x, eps, 1-eps)
         beta_ = torch.clamp(precision * (1 - x), eps, 1-eps)
         distribution = beta.Beta(alfa_, beta_)
-        
+
         log_probs = distribution.log_prob(torch.clamp(x_hat, eps, 1 - eps))
-        
+
         Re = log_probs.sum(1).mean()
 
         kl = kl_divergence(
@@ -221,7 +221,7 @@ np.save(name_of_model, stats)
 torch.save(vae.state_dict(), name_of_model)
 
 
-"""Eventuelt hent model her""" 
+"""Eventuelt hent model her"""
 # encoder = Encoder(encoder_network)
 # decoder = Decoder(decoder_network)
 # vae = VAE(encoder, decoder)
