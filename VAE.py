@@ -177,7 +177,7 @@ for epoch in range(num_epochs):
 
         log_probs = distribution.log_prob(torch.clamp(x_hat, eps, 1 - eps))
 
-        Re = log_probs.sum(1).mean()
+        Re = - log_probs.sum(1).mean()    ## negative, because we want to minimize
 
         kl = kl_divergence(
             Normal(0, 1),
