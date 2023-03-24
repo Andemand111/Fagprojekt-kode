@@ -7,6 +7,7 @@ from torch.utils.data import Dataset
 import torchvision.transforms as T
 import torch.nn as nn
 from torch.distributions import kl_divergence, Normal
+from torch import log, cosh
 
 # Definerer variable
 batch_size = 128
@@ -170,7 +171,7 @@ for epoch in range(num_epochs):
         mu, log_var, x_hat = vae(x)
         std = torch.exp(0.5 * log_var)
 
-        Re = torch.pow(x - x_hat, 2).sum(1).mean()
+        Re = log(cosh(x - x_hat)).sum(1).mean()
         kl = kl_divergence(
             Normal(0, 1),
             Normal(mu, std)).sum(1).mean()
