@@ -164,7 +164,7 @@ stats = np.zeros((num_epochs, 4))
 # %%
 optimizer = optim.Adam(vae.parameters(), lr=learning_rate)
 for epoch in range(num_epochs):
-    beta = cyclical(epoch, 30, 1, 1)
+    beta = cyclical(epoch, 30, 0.8, 1)
 
     for x in dataloader:
         optimizer.zero_grad()
