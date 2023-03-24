@@ -14,7 +14,6 @@ num_epochs = 200
 learning_rate = 0.001
 latent_size = 800
 eps = 1e-6
-alpha = 0.1
 name_of_model = "beta_bce"
 
 
@@ -136,10 +135,10 @@ encoder_network = nn.Sequential(
 decoder_network = nn.Sequential(
     nn.Linear(latent_size, 2048),
     nn.LeakyReLU(),
-    nn.Linear(2048, 4096),
+    
+    nn.Linear(2048, 8192),
     nn.LeakyReLU(),
-    nn.Linear(4096, 8192),
-    nn.LeakyReLU(),
+    
     nn.Linear(8192, 47*47*3),
     nn.Sigmoid()
 )
