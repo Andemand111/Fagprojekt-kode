@@ -17,6 +17,14 @@ latent_size = 800
 eps = 1e-6
 name_of_model = "beta_bce"
 
+kernel = torch.zeros((47,47,3))
+for i in range(47):
+    for j in range(47):
+        d = np.sqrt((i - 23.5)**2 + (j - 23.5)**2)
+        kernel[i,j] = 47 - d
+kernel = kernel * (47 * 47) / torch.sum(kernel)
+kernel = kernel.view(1, -1)
+
 
 class Faces(Dataset):
     """Scikit-Learn Digits dataset."""
@@ -157,8 +165,9 @@ for epoch in range(num_epochs):
         alfa = precision * x_hat
         beta = precision * (1 - x_hat)
 
-        ln_B = torch.lgamma(alfa + eps) + torch.lgamma(beta + eps) - torch.lgamma(alfa + beta + eps)
-        Re = -((alfa - 1) * log(x + eps) + (beta - 1) * log(1 - x + eps) - ln_B).sum(1).mean()
+        ln_B = lgamma(alfa + eps) + lgamma(beta + eps) - lgamma(alfa + beta + eps)
+        log_likelihood = -((alfa - 1) * log(x + eps) + (beta - 1) * log(1 - x + eps) - ln_B)
+        Re = (log_likelihood * kernel).sum(1).mean()
 
         kl = kl_divergence(
             Normal(mu, std),
