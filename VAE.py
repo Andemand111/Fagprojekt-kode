@@ -6,7 +6,8 @@ from sklearn.datasets import fetch_lfw_people
 from torch.utils.data import Dataset
 import torchvision.transforms as T
 import torch.nn as nn
-from torch.distributions import kl_divergence, Normal, Beta
+from torch.distributions import kl_divergence, Normal
+from torch import log, lgamma
 
 # Definerer variable
 batch_size = 128
@@ -96,24 +97,6 @@ class VAE(torch.nn.Module):
         return x_hat.detach().numpy()
 
 
-class Reshape(nn.Module):
-    def __init__(self, new_shape):
-        super(Reshape, self).__init__()
-        self.new_shape = new_shape
-
-    def forward(self, x):
-        return x.view(*self.new_shape)
-
-
-class Permute(nn.Module):
-    def __init__(self, new_order):
-        super(Permute, self).__init__()
-        self.new_order = new_order
-
-    def forward(self, x):
-        return x.permute(self.new_order)
-
-
 encoder_network = nn.Sequential(
     nn.Conv2d(3, 32, kernel_size=(3, 3), stride=2, padding=1),
     nn.LeakyReLU(),
@@ -163,27 +146,24 @@ stats = np.zeros((num_epochs, 4))
 # %%
 optimizer = optim.Adam(vae.parameters(), lr=learning_rate)
 for epoch in range(num_epochs):
-    kl_beta = cyclical(epoch, 30, 0.1, 0.2)
+    kl_beta = cyclical(epoch, 30, 35, 45)
 
     for x in dataloader:
         optimizer.zero_grad()
         mu, log_var, sampled_z, x_hat = vae(x)
         std = torch.exp(0.5 * log_var)
 
-        # Re = torch.pow(x - x_hat, 2).sum(1).mean()    ## negative, because we want to minimize
-        
-        precision = 50
-        alfa_ = torch.clamp(precision * x_hat, eps, 1-eps)
-        beta_ = torch.clamp(precision * (1 - x_hat), eps, 1-eps)
-        dist = Beta(alfa_, beta_)
-        log_probs = dist.log_prob(torch.clamp(x, eps, 1 - eps))
-        Re = - log_probs.sum(1).mean()
+        precision = 100
+        alfa = precision * x_hat
+        beta = precision * (1 - x_hat)
 
-        
+        ln_B = torch.lgamma(alfa + eps) + torch.lgamma(beta + eps) - torch.lgamma(alfa + beta + eps)
+        Re = -((alfa - 1) * log(x + eps) + (beta - 1) * log(1 - x + eps) - ln_B).sum(1).mean()
+
         kl = kl_divergence(
             Normal(mu, std),
             Normal(0, 1)
-            ).sum(1).mean()
+        ).sum(1).mean()
 
         loss = Re + kl_beta * kl
         loss.backward()
@@ -200,6 +180,7 @@ for epoch in range(num_epochs):
         rand_z = torch.randn((1, latent_size))
         generation = vae.decode_as_np(rand_z)
         ax.imshow(generation.reshape(47, 47, 3))
+    plt.show()
 
     fig, axs = plt.subplots(4, 2)
     for ax in axs:
@@ -221,7 +202,7 @@ for epoch in range(num_epochs):
 
 np.save(name_of_model, stats)
 torch.save(vae.state_dict(), name_of_model)
-
+#%%
 
 """Eventuelt hent model her"""
 # encoder = Encoder(encoder_network)
@@ -234,23 +215,23 @@ for z in random_zs:
     x_hat = vae.decode_as_np(z)
     plt.imshow(x_hat.reshape(47, 47, 3))
     plt.show()
-
+#%%
 random_faces = train_data[np.random.randint(len(train_data), size=10)]
 for face in random_faces:
-    encoding = vae.encoder(torch.tensor(face))
-    decoding = vae.decode_as_np(torch.tensor(encoding))
+    mu, _ = vae.encoder(torch.tensor(face))
+    decoding = vae.decode_as_np(torch.tensor(mu))
     plt.imshow(face.reshape(47, 47, 3))
     plt.show()
     plt.imshow(decoding.reshape(47, 47, 3))
     plt.show()
-
+#%%
 idx = np.random.randint(len(train_data))
 random_face = train_data[idx]
-encoding = vae.encode(torch.tensor(random_face))
-encoding_idx = np.where((-eps > encoding) & (encoding < eps))[1][0]
+mu = vae.encode_as_np(random_face)
 space = np.linspace(-2, 2, 20)
+encoding_idx = 0
 for i in space:
-    encoding[0, encoding_idx] = i
-    decoding = vae.decode_as_np(torch.tensor(encoding))
+    mu[0, 0:100] = i
+    decoding = vae.decode_as_np(torch.tensor(mu))
     plt.imshow(decoding.reshape(47, 47, 3))
     plt.show()
