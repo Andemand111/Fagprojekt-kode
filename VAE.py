@@ -133,7 +133,7 @@ print(res2.shape)
 
 dataloader = torch.utils.data.DataLoader(
     train_data, batch_size=batch_size,
-    shuffle=True)
+    drop_last = True, shuffle=True)
 
 
 encoder = Encoder(encoder_network)
@@ -141,14 +141,17 @@ decoder = Decoder(decoder_network)
 
 vae = VAE(encoder, decoder)
 
-stats = np.zeros((num_epochs, 4))
+stats = np.zeros((num_epochs, 3))
 
 # %%
 optimizer = optim.Adam(vae.parameters(), lr=learning_rate)
 for epoch in range(num_epochs):
     kl_beta = cyclical(epoch, 30, 35, 45)
-
-    for x in dataloader:
+    
+    dataloader_iterations = int(len(train_data) / batch_size)
+    epoch_stats = np.zeros((dataloader_iterations, 3))
+    
+    for i,x in enumerate(dataloader):
         optimizer.zero_grad()
         mu, log_var, sampled_z, x_hat = vae(x)
         std = torch.exp(0.5 * log_var)
@@ -157,7 +160,7 @@ for epoch in range(num_epochs):
         alfa = precision * x_hat
         beta = precision * (1 - x_hat)
 
-        ln_B = torch.lgamma(alfa + eps) + torch.lgamma(beta + eps) - torch.lgamma(alfa + beta + eps)
+        ln_B = torch.lgamma(alfa + eps) + torch.lgamma(beta + eps) - torch.lgamma(torch.tensor(precision))
         Re = -((alfa - 1) * log(x + eps) + (beta - 1) * log(1 - x + eps) - ln_B).sum(1).mean()
 
         kl = kl_divergence(
@@ -168,8 +171,10 @@ for epoch in range(num_epochs):
         loss = Re + kl_beta * kl
         loss.backward()
         optimizer.step()
+        
+        epoch_stats[i, :] = [loss.item(), Re.item(), kl.item()]
 
-    curr_stats = [epoch, loss.item(), Re.item(), kl.item()]
+    curr_stats = np.mean(epoch_stats, axis=0)
     stats[epoch, :] = curr_stats
 
     print("Beta = ", kl_beta)
@@ -196,7 +201,7 @@ for epoch in range(num_epochs):
     fig, axs = plt.subplots(1, 3)
     titles = ["Loss", "Re", "kl"]
     for i, ax in enumerate(axs.flatten()):
-        ax.plot(stats[:epoch+1, i+1])
+        ax.plot(stats[:epoch+1, i])
         ax.set_title(titles[i])
     plt.show()
 
