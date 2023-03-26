@@ -9,6 +9,7 @@ import torch.nn as nn
 from torch.distributions import kl_divergence, Normal
 
 # Definerer variable
+
 batch_size = 128
 num_epochs = 200
 learning_rate = 0.001
