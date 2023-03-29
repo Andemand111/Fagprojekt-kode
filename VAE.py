@@ -145,6 +145,12 @@ stats = np.zeros((num_epochs, 3))
 
 # %%
 optimizer = optim.Adam(vae.parameters(), lr=learning_rate)
+
+## for debugging
+torch.set_anomaly_enabled(True)
+
+
+### Training Loop
 for epoch in range(num_epochs):
     kl_beta = 70
 
