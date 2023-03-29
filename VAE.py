@@ -25,7 +25,7 @@ class Cells(Dataset):
 
     def __init__(self):
         self.path = "C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/Data/singlecell/singh_cp_pipeline_singlecell_images/merged_files/"
-        
+
     def __len__(self):
         return 488396
 
@@ -145,7 +145,6 @@ stats = np.zeros((num_epochs, 3))
 
 # %%
 optimizer = optim.Adam(vae.parameters(), lr=learning_rate)
-import tqdm as tqdm
 for epoch in range(num_epochs):
     kl_beta = 70
 
