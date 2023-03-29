@@ -1,9 +1,10 @@
 import os
-old_path = "your path here for old files"
-new_path = "your path here for new files"
+import shutil
+old_path = "C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/Data/singlecell/singh_cp_pipeline_singlecell_images/"
+new_path = "C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/Data/singlecell/singh_cp_pipeline_singlecell_images/merged_files/"
 os.chdir(new_path)
 idx = 0
-number_of_files = 480000
+number_of_files = 488000
 
 for subdir, dirs, files in os.walk(old_path):
     for file in files:
