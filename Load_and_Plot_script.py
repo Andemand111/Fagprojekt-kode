@@ -25,7 +25,7 @@ terminate = False
 data = np.zeros((n, 13872))
 #%%
 for folder in topfolder:
-    dirs = os.listdir(path + folder )
+    dirs = os.listdir(path + folder)
     for filename in dirs:
         print(filer / n)
         
@@ -40,8 +40,6 @@ for folder in topfolder:
             
     if terminate:
         break
-
-
 
 #%%
 # Plot Function
