@@ -1,6 +1,6 @@
 import os
-old_path = "your path here for old files"
-new_path = "your path here for new files"
+old_path = "your path here for old folder/"
+new_path = "your path here for new folder/"
 os.chdir(new_path)
 idx = 0
 number_of_files = 480000
