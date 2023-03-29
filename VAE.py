@@ -27,7 +27,7 @@ class Cells(Dataset):
         self.path = "C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/Data/singlecell/singh_cp_pipeline_singlecell_images/merged_files/"
 
     def __len__(self):
-        return 488396
+        return 488000
 
     def __getitem__(self, idx):
         sample = np.load(self.path + str(idx)) / 65535
