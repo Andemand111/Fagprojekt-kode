@@ -1,3 +1,4 @@
+#%%
 import torch
 import numpy as np
 import torch.optim as optim
@@ -8,37 +9,35 @@ import torchvision.transforms as T
 import torch.nn as nn
 from torch.distributions import kl_divergence, Normal
 from torch import log, lgamma
-
+#%%
 # Definerer variable
 
 batch_size = 128
-num_epochs = 200
+num_epochs = 10
 learning_rate = 0.001
-latent_size = 400
+latent_size = 800
 eps = 1e-6
 name_of_model = "beta_bce"
 
 
-class Faces(Dataset):
+class Cells(Dataset):
     """Scikit-Learn Digits dataset."""
 
     def __init__(self):
-        faces, _ = fetch_lfw_people(return_X_y=True, color=True)
-        faces = torch.tensor(faces).view(-1, 62, 47, 3).permute(0, 3, 1, 2)
-        resizer = T.Resize((47, 47))
-        faces = resizer(faces).permute(0, 2, 3, 1).view(-1, 47*47*3)
-
-        self.data = faces
-
+        self.path = "C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/Data/singlecell/singh_cp_pipeline_singlecell_images/merged_files/"
+        
     def __len__(self):
-        return len(self.data)
+        return 488396
 
     def __getitem__(self, idx):
-        sample = self.data[idx]
+        sample = np.load(self.path + str(idx)) / 65535
+        sample = sample.astype(np.float32)
+        sample = torch.from_numpy(sample).flatten()
         return sample
 
 
-train_data = Faces()
+
+train_data = Cells()
 
 
 def cyclical(epoch, interval, min_, max_):
@@ -53,7 +52,7 @@ class Encoder(torch.nn.Module):
         self.network = network
 
     def forward(self, x):
-        x_reshaped = x.view(-1, 47, 47, 3).permute(0, 3, 1, 2)
+        x_reshaped = x.view(-1, 68, 68, 3).permute(0, 3, 1, 2)
         z = self.network(x_reshaped)
         mu, log_var = torch.chunk(z, 2, 1)
         return mu, log_var
@@ -110,7 +109,7 @@ encoder_network = nn.Sequential(
 
     nn.Flatten(),
 
-    nn.Linear(4608, 2048),
+    nn.Linear(10368, 2048),
     nn.LeakyReLU(),
 
     nn.Linear(2048, 2 * latent_size)
@@ -123,11 +122,11 @@ decoder_network = nn.Sequential(
     nn.Linear(2048, 8192),
     nn.LeakyReLU(),
 
-    nn.Linear(8192, 47*47*3),
+    nn.Linear(8192, 68*68*3),
     nn.Sigmoid()
 )
 
-res1 = encoder_network(torch.randn((1, 3, 47, 47)))
+res1 = encoder_network(torch.randn((1, 3, 68, 68)))
 res2 = decoder_network(torch.randn((1, latent_size)))
 print(res1.shape)
 print(res2.shape)
@@ -146,13 +145,15 @@ stats = np.zeros((num_epochs, 3))
 
 # %%
 optimizer = optim.Adam(vae.parameters(), lr=learning_rate)
+import tqdm as tqdm
 for epoch in range(num_epochs):
-    kl_beta = cyclical(epoch, 30, 35, 45)
+    kl_beta = 70
 
     dataloader_iterations = int(len(train_data) / batch_size)
     epoch_stats = np.zeros((dataloader_iterations, 3))
 
     for i, x in enumerate(dataloader):
+        print(f'batch number {i} out of {dataloader_iterations}')
         optimizer.zero_grad()
         mu, log_var, sampled_z, x_hat = vae(x)
         std = torch.exp(0.5 * log_var)
