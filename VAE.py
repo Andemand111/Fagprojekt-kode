@@ -13,7 +13,7 @@ from torch import log, lgamma
 batch_size = 128
 num_epochs = 200
 learning_rate = 0.001
-latent_size = 800
+latent_size = 400
 eps = 1e-6
 name_of_model = "beta_bce"
 
@@ -133,7 +133,7 @@ print(res2.shape)
 
 dataloader = torch.utils.data.DataLoader(
     train_data, batch_size=batch_size,
-    drop_last = True, shuffle=True)
+    drop_last=True, shuffle=True)
 
 
 encoder = Encoder(encoder_network)
@@ -147,21 +147,24 @@ stats = np.zeros((num_epochs, 3))
 optimizer = optim.Adam(vae.parameters(), lr=learning_rate)
 for epoch in range(num_epochs):
     kl_beta = cyclical(epoch, 30, 35, 45)
-    
+
     dataloader_iterations = int(len(train_data) / batch_size)
     epoch_stats = np.zeros((dataloader_iterations, 3))
-    
-    for i,x in enumerate(dataloader):
+
+    for i, x in enumerate(dataloader):
         optimizer.zero_grad()
         mu, log_var, sampled_z, x_hat = vae(x)
         std = torch.exp(0.5 * log_var)
+
+        x = torch.clamp(x, eps, 1-eps)
 
         precision = 100
         alfa = precision * x_hat
         beta = precision * (1 - x_hat)
 
-        ln_B = torch.lgamma(alfa + eps) + torch.lgamma(beta + eps) - torch.lgamma(torch.tensor(precision))
-        Re = -((alfa - 1) * log(x + eps) + (beta - 1) * log(1 - x + eps) - ln_B).sum(1).mean()
+        ln_B = lgamma(alfa) + lgamma(beta) - lgamma(torch.tensor(precision))
+        Re = -((alfa - 1) * log(x) + (beta - 1)
+               * log(1 - x) - ln_B).sum(1).mean()
 
         kl = kl_divergence(
             Normal(mu, std),
@@ -171,7 +174,7 @@ for epoch in range(num_epochs):
         loss = Re + kl_beta * kl
         loss.backward()
         optimizer.step()
-        
+
         epoch_stats[i, :] = [loss.item(), Re.item(), kl.item()]
 
     curr_stats = np.mean(epoch_stats, axis=0)
@@ -207,20 +210,25 @@ for epoch in range(num_epochs):
 
 np.save(name_of_model, stats)
 torch.save(vae.state_dict(), name_of_model)
-#%%
+# %%
 
 """Eventuelt hent model her"""
-# encoder = Encoder(encoder_network)
-# decoder = Decoder(decoder_network)
-# vae = VAE(encoder, decoder)
-# vae.load_state_dict(torch.load("betabce"))
+encoder = Encoder(encoder_network)
+decoder = Decoder(decoder_network)
+vae = VAE(encoder, decoder)
+vae.load_state_dict(torch.load("beta_bce"))
 
+#%%
+
+## laver tilfældigt genererede billeder
 random_zs = torch.randn((10, latent_size))
 for z in random_zs:
     x_hat = vae.decode_as_np(z)
     plt.imshow(x_hat.reshape(47, 47, 3))
     plt.show()
-#%%
+# %%
+
+## laver en rekonstruktion af et tilfældigt ansigt
 random_faces = train_data[np.random.randint(len(train_data), size=10)]
 for face in random_faces:
     mu, _ = vae.encoder(torch.tensor(face))
@@ -229,14 +237,38 @@ for face in random_faces:
     plt.show()
     plt.imshow(decoding.reshape(47, 47, 3))
     plt.show()
-#%%
+# %%
+
+## ændrer på en latent variabel over tid
+fig, axs = plt.subplots(5,5)
 idx = np.random.randint(len(train_data))
 random_face = train_data[idx]
 mu = vae.encode_as_np(random_face)
-space = np.linspace(-2, 2, 20)
+space = np.linspace(-2, 2, 25)
 encoding_idx = 0
-for i in space:
-    mu[0, 0:100] = i
+for i, ax in zip(space, axs.flatten()):
+    mu[0, 2] = i
     decoding = vae.decode_as_np(torch.tensor(mu))
-    plt.imshow(decoding.reshape(47, 47, 3))
-    plt.show()
+    ax.imshow(decoding.reshape(47, 47, 3))
+    
+#%%
+
+## interpolerer mellem to billeder
+randomface1 = train_data[np.random.randint(len(train_data))]
+randomface2 = train_data[np.random.randint(len(train_data))]
+encoding1, _ = vae.encoder(randomface1)
+encoding2, _ = vae.encoder(randomface2)
+
+fig, axs = plt.subplots(1,2)
+axs[0].imshow(randomface1.view(47,47,3))
+axs[1].imshow(randomface2.view(47,47,3))
+
+retning = encoding2 - encoding1
+
+fig, axs = plt.subplots(4,4)
+for i, ax in enumerate(axs.flatten()):
+    step = i / 16 * retning
+    new_z = encoding1 + step
+    generated_face = vae.decode_as_np(new_z)
+    ax.imshow(generated_face.reshape(47,47,3))
+plt.savefig("interpolations", dpi=300)
