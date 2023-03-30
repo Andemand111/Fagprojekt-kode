@@ -8,6 +8,8 @@ import torchvision.transforms as T
 import torch.nn as nn
 from torch.distributions import kl_divergence, Normal
 from torch import log, lgamma
+from torchsummary import summary
+
 #%%
 # Definerer variable
 
@@ -27,13 +29,15 @@ class Cells(Dataset):
 
     def __len__(self):
         return 488000
-
+    
     def __getitem__(self, idx):
         sample = np.load(self.path + str(idx)).astype(np.float32)
-        sample = sample.reshape(-1,3)
+        
         # divide by max value in each channel
+        sample = sample.reshape(-1,3)
         RGBmax = np.max(sample,axis=0)
         sample /= RGBmax
+        
         sample = torch.from_numpy(sample).flatten()
         return sample
 
