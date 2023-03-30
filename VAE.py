@@ -4,7 +4,6 @@ import numpy as np
 import torch.optim as optim
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset
-import torchvision.transforms as T
 import torch.nn as nn
 from torch.distributions import kl_divergence, Normal
 from torch import log, lgamma
@@ -122,20 +121,22 @@ encoder_network = nn.Sequential(
 )
 
 decoder_network = nn.Sequential(
-    nn.Linear(latent_size, 2048),
+    nn.Linear(latent_size, 1024),
+    nn.LeakyReLU(),
+    
+    nn.Linear(1024, 4096),
     nn.LeakyReLU(),
 
-    nn.Linear(2048, 8192),
-    nn.LeakyReLU(),
-
-    nn.Linear(8192, 68*68*3),
+    nn.Linear(4096, 68*68*3),
     nn.Sigmoid()
 )
 
-res1 = encoder_network(torch.randn((1, 3, 68, 68)))
-res2 = decoder_network(torch.randn((1, latent_size)))
-print("Output shape of encoder: ", res1.size())
-print("Output shape of decoder: ", res2.size())
+print("Encoder network:")
+summary(encoder_network, (3, 68, 68))
+print("\n" * 3)
+print("Decoder network:")
+summary(decoder_network, (1, latent_size))
+
 
 dataloader = torch.utils.data.DataLoader(
     train_data, batch_size=batch_size,
@@ -170,6 +171,7 @@ for epoch in range(num_epochs):
         std = torch.exp(0.5 * log_var)
 
         x = torch.clamp(x, eps, 1-eps)
+        x_hat = torch.clamp(x_hat, eps, 1 - eps)
 
         precision = 100
         alfa = precision * x_hat
