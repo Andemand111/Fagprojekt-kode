@@ -19,7 +19,6 @@ eps = 1e-6
 name_of_model = "beta_bce"
 
 ### Loading data and standardizing ###
-
 class Cells(Dataset):
     """BBBC021 dataset."""
 
