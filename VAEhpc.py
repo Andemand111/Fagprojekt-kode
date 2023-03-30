@@ -4,10 +4,11 @@ import numpy as np
 import torch.optim as optim
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset
-import torchvision.transforms as T
 import torch.nn as nn
 from torch.distributions import kl_divergence, Normal
 from torch import log, lgamma
+from torchsummary import summary
+
 #%%
 # Definerer variable
 
@@ -24,16 +25,18 @@ class Cells(Dataset):
 
     def __init__(self):
         self.path = "/zhome/5a/2/167858/Desktop/merged_files/"
+
     def __len__(self):
         return 488000
-
+    
     def __getitem__(self, idx):
-        sample = np.load(self.path + str(idx))
-        sample = sample.reshape(-1,3)
+        sample = np.load(self.path + str(idx)).astype(np.float32)
+        
         # divide by max value in each channel
+        sample = sample.reshape(-1,3)
         RGBmax = np.max(sample,axis=0)
-        sample[:,0],sample[:,1],sample[:,2] = sample[:,0]/RGBmax[0],sample[:,1]/RGBmax[1],sample[:,2]/RGBmax[2]
-        sample = sample.astype(np.float32)
+        sample /= RGBmax
+        
         sample = torch.from_numpy(sample).flatten()
         return sample
 
@@ -118,20 +121,22 @@ encoder_network = nn.Sequential(
 )
 
 decoder_network = nn.Sequential(
-    nn.Linear(latent_size, 2048),
+    nn.Linear(latent_size, 1024),
+    nn.LeakyReLU(),
+    
+    nn.Linear(1024, 4096),
     nn.LeakyReLU(),
 
-    nn.Linear(2048, 8192),
-    nn.LeakyReLU(),
-
-    nn.Linear(8192, 68*68*3),
+    nn.Linear(4096, 68*68*3),
     nn.Sigmoid()
 )
 
-res1 = encoder_network(torch.randn((1, 3, 68, 68)))
-res2 = decoder_network(torch.randn((1, latent_size)))
-print(res1.shape)
-print(res2.shape)
+print("Encoder network:")
+summary(encoder_network, (3, 68, 68))
+print("\n" * 3)
+print("Decoder network:")
+summary(decoder_network, (1, latent_size))
+
 
 dataloader = torch.utils.data.DataLoader(
     train_data, batch_size=batch_size,
@@ -166,6 +171,7 @@ for epoch in range(num_epochs):
         std = torch.exp(0.5 * log_var)
 
         x = torch.clamp(x, eps, 1-eps)
+        x_hat = torch.clamp(x_hat, eps, 1 - eps)
 
         precision = 100
         alfa = precision * x_hat
