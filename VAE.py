@@ -21,7 +21,7 @@ name_of_model = "beta_bce"
 
 
 class Cells(Dataset):
-    """Scikit-Learn Digits dataset."""
+    """BBBC021 dataset."""
 
     def __init__(self):
         self.path = "C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/Data/singlecell/singh_cp_pipeline_singlecell_images/merged_files/"
@@ -194,7 +194,7 @@ for epoch in range(num_epochs):
     for ax in axs.flatten():
         rand_z = torch.randn((1, latent_size))
         generation = vae.decode_as_np(rand_z)
-        ax.imshow(generation.reshape(47, 47, 3))
+        ax.imshow(generation.reshape(68, 68, 3))
     plt.show()
 
     fig, axs = plt.subplots(4, 2)
@@ -203,8 +203,8 @@ for epoch in range(num_epochs):
         random_face = train_data[rand_indx]
         z, _ = vae.encoder(random_face)
         x_hat = vae.decode_as_np(z)
-        ax[0].imshow(random_face.reshape(47, 47, 3))
-        ax[1].imshow(x_hat.reshape(47, 47, 3))
+        ax[0].imshow(random_face.reshape(68, 68, 3))
+        ax[1].imshow(x_hat.reshape(68, 68, 3))
     fig.set_size_inches(4, 10)
     plt.show()
 
@@ -231,7 +231,7 @@ vae.load_state_dict(torch.load("beta_bce"))
 random_zs = torch.randn((10, latent_size))
 for z in random_zs:
     x_hat = vae.decode_as_np(z)
-    plt.imshow(x_hat.reshape(47, 47, 3))
+    plt.imshow(x_hat.reshape(68, 68, 3))
     plt.show()
 # %%
 
@@ -240,9 +240,9 @@ random_faces = train_data[np.random.randint(len(train_data), size=10)]
 for face in random_faces:
     mu, _ = vae.encoder(torch.tensor(face))
     decoding = vae.decode_as_np(torch.tensor(mu))
-    plt.imshow(face.reshape(47, 47, 3))
+    plt.imshow(face.reshape(68, 68, 3))
     plt.show()
-    plt.imshow(decoding.reshape(47, 47, 3))
+    plt.imshow(decoding.reshape(68, 68, 3))
     plt.show()
 # %%
 
@@ -256,7 +256,7 @@ encoding_idx = 0
 for i, ax in zip(space, axs.flatten()):
     mu[0, 2] = i
     decoding = vae.decode_as_np(torch.tensor(mu))
-    ax.imshow(decoding.reshape(47, 47, 3))
+    ax.imshow(decoding.reshape(68, 68, 3))
     
 #%%
 
@@ -267,8 +267,8 @@ encoding1, _ = vae.encoder(randomface1)
 encoding2, _ = vae.encoder(randomface2)
 
 fig, axs = plt.subplots(1,2)
-axs[0].imshow(randomface1.view(47,47,3))
-axs[1].imshow(randomface2.view(47,47,3))
+axs[0].imshow(randomface1.view(68,68,3))
+axs[1].imshow(randomface2.view(68,68,3))
 
 retning = encoding2 - encoding1
 
@@ -277,5 +277,5 @@ for i, ax in enumerate(axs.flatten()):
     step = i / 16 * retning
     new_z = encoding1 + step
     generated_face = vae.decode_as_np(new_z)
-    ax.imshow(generated_face.reshape(47,47,3))
+    ax.imshow(generated_face.reshape(68,68,3))
 plt.savefig("interpolations", dpi=300)
