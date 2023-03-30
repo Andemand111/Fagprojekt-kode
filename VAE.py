@@ -3,7 +3,6 @@ import torch
 import numpy as np
 import torch.optim as optim
 import matplotlib.pyplot as plt
-from sklearn.datasets import fetch_lfw_people
 from torch.utils.data import Dataset
 import torchvision.transforms as T
 import torch.nn as nn
@@ -19,6 +18,7 @@ latent_size = 800
 eps = 1e-6
 name_of_model = "beta_bce"
 
+### Loading data and standardizing ###
 
 class Cells(Dataset):
     """BBBC021 dataset."""
@@ -30,12 +30,16 @@ class Cells(Dataset):
         return 488000
 
     def __getitem__(self, idx):
-        sample = np.load(self.path + str(idx)) / 65535
+        sample = np.load(self.path + str(idx))
+        sample = sample.reshape(-1,3)
+        # divide by max value in each channel
+        RGBmax = np.max(sample,axis=0)
+        sample[:,0],sample[:,1],sample[:,2] = sample[:,0]/RGBmax[0],sample[:,1]/RGBmax[1],sample[:,2]/RGBmax[2]
         sample = sample.astype(np.float32)
         sample = torch.from_numpy(sample).flatten()
         return sample
 
-
+#%%
 
 train_data = Cells()
 
