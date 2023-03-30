@@ -29,12 +29,11 @@ class Cells(Dataset):
         return 488000
 
     def __getitem__(self, idx):
-        sample = np.load(self.path + str(idx))
+        sample = np.load(self.path + str(idx)).astype(np.float32)
         sample = sample.reshape(-1,3)
         # divide by max value in each channel
         RGBmax = np.max(sample,axis=0)
-        sample[:,0],sample[:,1],sample[:,2] = sample[:,0]/RGBmax[0],sample[:,1]/RGBmax[1],sample[:,2]/RGBmax[2]
-        sample = sample.astype(np.float32)
+        sample /= RGBmax
         sample = torch.from_numpy(sample).flatten()
         return sample
 
@@ -131,8 +130,8 @@ decoder_network = nn.Sequential(
 
 res1 = encoder_network(torch.randn((1, 3, 68, 68)))
 res2 = decoder_network(torch.randn((1, latent_size)))
-print(res1.shape)
-print(res2.shape)
+print("Output shape of encoder: ", res1.size())
+print("Output shape of decoder: ", res2.size())
 
 dataloader = torch.utils.data.DataLoader(
     train_data, batch_size=batch_size,
