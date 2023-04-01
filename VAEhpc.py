@@ -140,13 +140,15 @@ summary(decoder_network, (1, latent_size))
 
 dataloader = torch.utils.data.DataLoader(
     train_data, batch_size=batch_size,
-    drop_last=True, shuffle=True)
+    drop_last=True, shuffle=True, pin_memory=True)
 
 
 encoder = Encoder(encoder_network)
 decoder = Decoder(decoder_network)
 
 vae = VAE(encoder, decoder)
+vae = vae.to(torch.device("cuda:0"))
+
 
 stats = np.zeros((num_epochs, 3))
 

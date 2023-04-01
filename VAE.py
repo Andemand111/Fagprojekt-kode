@@ -147,6 +147,8 @@ encoder = Encoder(encoder_network)
 decoder = Decoder(decoder_network)
 
 vae = VAE(encoder, decoder)
+vae.to(torch.device("cuda:0"))
+
 
 stats = np.zeros((num_epochs, 3))
 
