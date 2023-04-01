@@ -24,7 +24,7 @@ class Cells(Dataset):
     """BBBC021 dataset."""
 
     def __init__(self):
-        self.path = "C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/Data/singlecell/singh_cp_pipeline_singlecell_images/merged_files/"
+        self.path = "/zhome/5a/2/167858/Desktop/merged_files/"
 
     def __len__(self):
         return 488000
