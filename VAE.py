@@ -5,7 +5,6 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset
 import torch.nn as nn
-from torch.distributions import kl_divergence, Normal
 from torch import log, lgamma
 from torchsummary import summary
 
@@ -13,9 +12,9 @@ from torchsummary import summary
 # Definerer variable
 
 batch_size = 128
-num_epochs = 10
+num_epochs = 60
 learning_rate = 0.001
-latent_size = 800
+latent_size = 400
 eps = 1e-6
 name_of_model = "beta_bce"
 
@@ -23,26 +22,29 @@ name_of_model = "beta_bce"
 class Cells(Dataset):
     """BBBC021 dataset."""
 
-    def __init__(self):
-        self.path = "/zhome/5a/2/167858/Desktop/merged_files/"
+    def __init__(self, data):
+        self.data = data
 
     def __len__(self):
-        return 488000
+        return len(self.data)
     
     def __getitem__(self, idx):
-        sample = np.load(self.path + str(idx)).astype(np.float32)
+        sample = self.data[idx]
         
         # divide by max value in each channel
         sample = sample.reshape(-1,3)
         RGBmax = np.max(sample,axis=0)
         sample /= RGBmax
         
-        sample = torch.from_numpy(sample).flatten()
+        sample = torch.from_numpy(sample).flatten().float()
         return sample
 
 #%%
 
-train_data = Cells()
+data = np.load("celle_data.npy")
+
+#%%
+train_data = Cells(data)
 
 
 def cyclical(epoch, interval, min_, max_):
@@ -120,16 +122,74 @@ encoder_network = nn.Sequential(
     nn.Linear(2048, 2 * latent_size)
 )
 
+class Reshape(nn.Module):
+    def __init__(self, newshape):
+        super(Reshape, self).__init__()
+        self.newshape = newshape
+    
+    def forward(self, x):
+        return x.view(*self.newshape)
+
+# class Permute(nn.Module):
+#     def __init__(self, newshape):
+#         super(Permute, self).__init__()
+#         self.newshape = newshape
+    
+#     def forward(self, x):
+#         return x.permute(*self.newshape)
+
+# decoder_network = nn.Sequential(
+#     nn.Linear(latent_size, 8192),
+#     nn.LeakyReLU(),
+    
+#     Reshape((-1, 2048, 2, 2)),
+    
+#     nn.ConvTranspose2d(2048, 1024, kernel_size=(4,4), stride=2),
+#     nn.LeakyReLU(),
+    
+#     nn.ConvTranspose2d(1024, 512, kernel_size=(3,3), stride=2),
+#     nn.LeakyReLU(),
+    
+#     nn.ConvTranspose2d(512, 256, kernel_size=(3,3), stride=2),
+#     nn.LeakyReLU(),
+    
+#     nn.ConvTranspose2d(256, 128, kernel_size=(3,3), stride=2),
+#     nn.LeakyReLU(),
+    
+#     nn.ConvTranspose2d(128, 64, kernel_size=(3,3), stride=1),
+#     nn.LeakyReLU(),
+    
+#     nn.ConvTranspose2d(64, 32, kernel_size=(3,3), stride=1),
+#     nn.LeakyReLU(),
+    
+#     nn.ConvTranspose2d(32, 16, kernel_size=(3,3), stride=1),
+#     nn.LeakyReLU(),
+    
+#     nn.ConvTranspose2d(16, 8, kernel_size=(3,3), stride=1),
+#     nn.LeakyReLU(),
+    
+#     nn.ConvTranspose2d(8, 3, kernel_size=(3,3), stride=1),
+#     nn.LeakyReLU(),
+    
+#     nn.ConvTranspose2d(3, 3, kernel_size=(4,4), stride=1),
+#     nn.Sigmoid(),
+
+#     Permute((0, 2, 3, 1)),
+#     nn.Flatten(),
+# )
+
 decoder_network = nn.Sequential(
-    nn.Linear(latent_size, 1024),
+    nn.Linear(latent_size, 2048),
     nn.LeakyReLU(),
     
-    nn.Linear(1024, 4096),
+    nn.Linear(2048, 4096),
     nn.LeakyReLU(),
+    
+    nn.Linear(4096, 68 * 68 * 3),
+    nn.Sigmoid(),
+    )
 
-    nn.Linear(4096, 68*68*3),
-    nn.Sigmoid()
-)
+# print(decoder_network(torch.randn((1,latent_size))).shape)
 
 print("Encoder network:")
 summary(encoder_network, (3, 68, 68))
@@ -159,16 +219,15 @@ torch.set_anomaly_enabled(True)
 
 ### Training Loop
 for epoch in range(num_epochs):
-    kl_beta = 70
+    kl_beta = 4
 
     dataloader_iterations = int(len(train_data) / batch_size)
-    epoch_stats = np.zeros((dataloader_iterations, 3))
+    curr_stats = np.zeros((dataloader_iterations, 3))
 
     for i, x in enumerate(dataloader):
-        #print(f'batch number {i} out of {dataloader_iterations}')
+        print(f'batch number {i} out of {dataloader_iterations}')
         optimizer.zero_grad()
         mu, log_var, sampled_z, x_hat = vae(x)
-        std = torch.exp(0.5 * log_var)
 
         x = torch.clamp(x, eps, 1-eps)
         x_hat = torch.clamp(x_hat, eps, 1 - eps)
@@ -181,22 +240,19 @@ for epoch in range(num_epochs):
         Re = -((alfa - 1) * log(x) + (beta - 1)
                * log(1 - x) - ln_B).sum(1).mean()
 
-        kl = kl_divergence(
-            Normal(mu, std),
-            Normal(0, 1)
-        ).sum(1).mean()
+        kl = (-0.5 * (1 + log_var - mu ** 2 - log_var.exp())).sum(1).mean()
 
         loss = Re + kl_beta * kl
         loss.backward()
         optimizer.step()
+        
+        curr_stats[i, :] = [loss.item(), Re.item(), kl.item()]
 
-        epoch_stats[i, :] = [loss.item(), Re.item(), kl.item()]
-
-    curr_stats = np.mean(epoch_stats, axis=0)
-    stats[epoch, :] = curr_stats
+    epoch_stats = np.mean(curr_stats, axis=0)
+    stats[epoch, :] = epoch_stats
 
     print("Beta = ", kl_beta)
-    print(*curr_stats, "\n")
+    print(*epoch_stats, "\n")
 
     fig, axs = plt.subplots(3, 3)
     for ax in axs.flatten():
@@ -223,6 +279,7 @@ for epoch in range(num_epochs):
         ax.set_title(titles[i])
     plt.show()
 
+#%%
 np.save(name_of_model, stats)
 torch.save(vae.state_dict(), name_of_model)
 # %%
@@ -244,14 +301,17 @@ for z in random_zs:
 # %%
 
 ## laver en rekonstruktion af et tilfældigt ansigt
-random_faces = train_data[np.random.randint(len(train_data), size=10)]
+random_faces = train_data[np.random.randint(len(train_data))].view(1,-1)
+fig, ax = plt.subplots(1,2)
 for face in random_faces:
     mu, _ = vae.encoder(torch.tensor(face))
     decoding = vae.decode_as_np(torch.tensor(mu))
-    plt.imshow(face.reshape(68, 68, 3))
-    plt.show()
-    plt.imshow(decoding.reshape(68, 68, 3))
-    plt.show()
+    ax[0].imshow(face.reshape(68, 68, 3))
+    ax[1].imshow(decoding.reshape(68, 68, 3))
+    
+    ax[0].set_title("Real")
+    ax[1].set_title("Reconstruction")    
+    
 # %%
 
 ## ændrer på en latent variabel over tid
@@ -265,6 +325,10 @@ for i, ax in zip(space, axs.flatten()):
     mu[0, 2] = i
     decoding = vae.decode_as_np(torch.tensor(mu))
     ax.imshow(decoding.reshape(68, 68, 3))
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+plt.savefig("Changing feature", dpi=300)    
     
 #%%
 
@@ -286,4 +350,5 @@ for i, ax in enumerate(axs.flatten()):
     new_z = encoding1 + step
     generated_face = vae.decode_as_np(new_z)
     ax.imshow(generated_face.reshape(68,68,3))
+    
 plt.savefig("interpolations", dpi=300)
