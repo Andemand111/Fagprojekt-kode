@@ -14,7 +14,7 @@ from torchsummary import summary
 batch_size = 128
 num_epochs = 60
 learning_rate = 0.001
-latent_size = 400
+latent_size = 600
 eps = 1e-6
 name_of_model = "beta_bce"
 
@@ -61,8 +61,8 @@ class Encoder(torch.nn.Module):
     def forward(self, x):
         x_reshaped = x.view(-1, 68, 68, 3).permute(0, 3, 1, 2)
         z = self.network(x_reshaped)
-        mu, log_var = torch.chunk(z, 2, 1)
-        return mu, log_var
+        mu, log_var, log_spike = torch.chunk(z, 3, 1)
+        return mu, log_var, log_spike
 
 
 class Decoder(torch.nn.Module):
@@ -81,23 +81,28 @@ class VAE(torch.nn.Module):
         self.encoder = encoder
         self.decoder = decoder
 
-    def reparameterization(self, mu, log_var):
+    def reparameterization(self, mu, log_var, log_spike):
         std = torch.exp(0.5 * log_var)
         eps_ = torch.randn_like(std)
-        new_z = mu + eps_ * std
-
-        return new_z
+        gaussian = eps_.mul(std).add_(mu)
+        eta = torch.randn_like(std)
+        
+        c = 50
+        selection = torch.sigmoid(c * (eta + log_spike.exp() - 1))
+        return selection.mul(gaussian)
 
     def forward(self, x):
-        mu, log_var = self.encoder(x)
-        sampled_z = self.reparameterization(mu, log_var)
+        mu, log_var, log_spike = self.encoder(x)
+        sampled_z = self.reparameterization(mu, log_var, log_spike)
         x_hat = self.decoder(sampled_z)
-
-        return mu, log_var, sampled_z, x_hat
+        
+        return mu, log_var, log_spike, sampled_z, x_hat
 
     def encode_as_np(self, x):
-        mu, log_var = self.encoder(x)
-        return mu.detach().numpy()
+        mu, log_var, log_spike = self.encoder(x)
+        sampled_z = self.reparameterization(mu, log_var, log_spike)
+        
+        return sampled_z.detach().numpy()
 
     def decode_as_np(self, z):
         x_hat = self.decoder(z)
@@ -119,7 +124,7 @@ encoder_network = nn.Sequential(
     nn.Linear(10368, 2048),
     nn.LeakyReLU(),
 
-    nn.Linear(2048, 2 * latent_size)
+    nn.Linear(2048, 3 * latent_size)
 )
 
 class Reshape(nn.Module):
@@ -129,54 +134,6 @@ class Reshape(nn.Module):
     
     def forward(self, x):
         return x.view(*self.newshape)
-
-# class Permute(nn.Module):
-#     def __init__(self, newshape):
-#         super(Permute, self).__init__()
-#         self.newshape = newshape
-    
-#     def forward(self, x):
-#         return x.permute(*self.newshape)
-
-# decoder_network = nn.Sequential(
-#     nn.Linear(latent_size, 8192),
-#     nn.LeakyReLU(),
-    
-#     Reshape((-1, 2048, 2, 2)),
-    
-#     nn.ConvTranspose2d(2048, 1024, kernel_size=(4,4), stride=2),
-#     nn.LeakyReLU(),
-    
-#     nn.ConvTranspose2d(1024, 512, kernel_size=(3,3), stride=2),
-#     nn.LeakyReLU(),
-    
-#     nn.ConvTranspose2d(512, 256, kernel_size=(3,3), stride=2),
-#     nn.LeakyReLU(),
-    
-#     nn.ConvTranspose2d(256, 128, kernel_size=(3,3), stride=2),
-#     nn.LeakyReLU(),
-    
-#     nn.ConvTranspose2d(128, 64, kernel_size=(3,3), stride=1),
-#     nn.LeakyReLU(),
-    
-#     nn.ConvTranspose2d(64, 32, kernel_size=(3,3), stride=1),
-#     nn.LeakyReLU(),
-    
-#     nn.ConvTranspose2d(32, 16, kernel_size=(3,3), stride=1),
-#     nn.LeakyReLU(),
-    
-#     nn.ConvTranspose2d(16, 8, kernel_size=(3,3), stride=1),
-#     nn.LeakyReLU(),
-    
-#     nn.ConvTranspose2d(8, 3, kernel_size=(3,3), stride=1),
-#     nn.LeakyReLU(),
-    
-#     nn.ConvTranspose2d(3, 3, kernel_size=(4,4), stride=1),
-#     nn.Sigmoid(),
-
-#     Permute((0, 2, 3, 1)),
-#     nn.Flatten(),
-# )
 
 decoder_network = nn.Sequential(
     nn.Linear(latent_size, 2048),
@@ -227,7 +184,7 @@ for epoch in range(num_epochs):
     for i, x in enumerate(dataloader):
         print(f'batch number {i} out of {dataloader_iterations}')
         optimizer.zero_grad()
-        mu, log_var, sampled_z, x_hat = vae(x)
+        mu, log_var, log_spike, sampled_z, x_hat = vae(x)
 
         x = torch.clamp(x, eps, 1-eps)
         x_hat = torch.clamp(x_hat, eps, 1 - eps)
@@ -240,7 +197,13 @@ for epoch in range(num_epochs):
         Re = -((alfa - 1) * log(x) + (beta - 1)
                * log(1 - x) - ln_B).sum(1).mean()
 
-        kl = (-0.5 * (1 + log_var - mu ** 2 - log_var.exp())).sum(1).mean()
+        spike = torch.clamp(log_spike.exp(), eps, 1.0 - eps) 
+        alpha = 0.7
+        prior1 = -0.5 * torch.sum(spike.mul(1 + log_var - mu.pow(2) - log_var.exp()))
+        prior21 = (1 - spike).mul(torch.log((1 - spike) / (1 - alpha)))
+        prior22 = spike.mul(torch.log(spike / alpha))
+        prior2 = torch.sum(prior21 + prior22)
+        kl = prior1 + prior2
 
         loss = Re + kl_beta * kl
         loss.backward()
