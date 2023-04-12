@@ -1,22 +1,45 @@
 import matplotlib.pyplot as plt
 import numpy as np
-
-data = np.load("din filvej her")
-
-data = data.reshape(-1,3)
-datamax = np.max(data,axis=0)
-data = data/datamax
-
+from scipy.stats import beta
+from scipy.stats import norm
+from fitter import Fitter
 #%%
 
+data = np.load("celle_data.npy")
+#%%
 
-plt.subplot(2,2,1)
-plt.hist(data[:,0],bins = 50)
+rgbmax = np.amax(data.reshape(-1, 68, 68, 3), axis=(1,2), keepdims=True)
+normalized_data = data.reshape(-1,68,68,3) / rgbmax
 
-plt.subplot(2,2,2)
-plt.hist(data[:,1],bins = 50)
+#%%
+np.random.seed(1)
+eps = 1e-3
+fig, axs = plt.subplots(3,3)
+for ax in axs.flatten():
+    randx = np.random.randint(68)
+    randy = np.random.randint(68)
+    randc = np.random.randint(3)
+    
+    pixel = normalized_data[:, randx, randy, randc].flatten()
+    # ax.hist(pixel, density=True, bins=50)
+    
+    # ax.set_xticks([])
+    # ax.set_yticks([])
+    
+    # a,b,_,_ = beta.fit(np.clip(pixel, eps, 1-eps))    
+    # xs = np.linspace(eps, 1-eps)
+    # ys = beta.pdf(xs, a, b)
+    # ax.plot(xs, ys)
+    
 
-plt.subplot(2,2,3)
-plt.hist(data[:,2],bins = 50)
-
-plt.show()
+    # mu, std = norm.fit(pixel)
+    # xs = np.linspace(0,1)
+    # ys = norm.pdf(xs, mu, std)
+    # ax.plot(xs, ys)
+    
+    f = Fitter(pixel,
+           distributions=["beta",
+                          "norm"])
+    f.fit()
+    f.summary()
+    plt.show()
