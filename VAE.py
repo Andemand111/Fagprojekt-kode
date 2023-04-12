@@ -98,15 +98,15 @@ class VAE(torch.nn.Module):
         
         return mu, log_var, log_spike, sampled_z, x_hat
 
-    def encode_as_np(self, x):
-        mu, log_var, log_spike = self.encoder(x)
+    def encode(self, x):
+        mu, log_var, log_spikeike = self.encoder(x)
         sampled_z = self.reparameterization(mu, log_var, log_spike)
         
-        return sampled_z.detach().numpy()
+        return sampled_z
 
-    def decode_as_np(self, z):
+    def decode(self, z):
         x_hat = self.decoder(z)
-        return x_hat.detach().numpy()
+        return x_hat
 
 
 encoder_network = nn.Sequential(
@@ -198,7 +198,7 @@ for epoch in range(num_epochs):
                * log(1 - x) - ln_B).sum(1).mean()
 
         spike = torch.clamp(log_spike.exp(), eps, 1.0 - eps) 
-        alpha = 0.7
+        alpha = 0.6
         prior1 = -0.5 * torch.sum(spike.mul(1 + log_var - mu.pow(2) - log_var.exp()))
         prior21 = (1 - spike).mul(torch.log((1 - spike) / (1 - alpha)))
         prior22 = spike.mul(torch.log(spike / alpha))
@@ -220,18 +220,18 @@ for epoch in range(num_epochs):
     fig, axs = plt.subplots(3, 3)
     for ax in axs.flatten():
         rand_z = torch.randn((1, latent_size))
-        generation = vae.decode_as_np(rand_z)
-        ax.imshow(generation.reshape(68, 68, 3))
+        generation = vae.decode(rand_z)
+        ax.imshow(generation.detach().reshape(68, 68, 3))
     plt.show()
 
     fig, axs = plt.subplots(4, 2)
     for ax in axs:
         rand_indx = np.random.randint(len(train_data))
-        random_face = train_data[rand_indx]
-        z, _ = vae.encoder(random_face)
-        x_hat = vae.decode_as_np(z)
-        ax[0].imshow(random_face.reshape(68, 68, 3))
-        ax[1].imshow(x_hat.reshape(68, 68, 3))
+        random_cell = train_data[rand_indx]
+        z = vae.encode(random_cell)
+        x_hat = vae.decode(z)
+        ax[0].imshow(random_cell.reshape(68, 68, 3))
+        ax[1].imshow(x_hat.detach().reshape(68, 68, 3))
     fig.set_size_inches(4, 10)
     plt.show()
 
