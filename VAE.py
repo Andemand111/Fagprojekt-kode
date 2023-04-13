@@ -14,9 +14,10 @@ from torchsummary import summary
 batch_size = 128
 num_epochs = 60
 learning_rate = 0.001
-latent_size = 600
+latent_size = 800
 eps = 1e-6
 name_of_model = "beta_bce"
+alpha = 0.7
 
 ### Loading data and standardizing ###
 class Cells(Dataset):
@@ -99,14 +100,16 @@ class VAE(torch.nn.Module):
         return mu, log_var, log_spike, sampled_z, x_hat
 
     def encode(self, x):
-        mu, log_var, log_spikeike = self.encoder(x)
-        sampled_z = self.reparameterization(mu, log_var, log_spike)
+        mu, log_var, log_spike = self.encoder(x)
+        c = 50
+        selection = torch.sigmoid(c * (log_spike.exp() - 1))
         
-        return sampled_z
+        return selection.mul(mu).detach()
 
     def decode(self, z):
         x_hat = self.decoder(z)
-        return x_hat
+        
+        return x_hat.detach()
 
 
 encoder_network = nn.Sequential(
@@ -176,13 +179,13 @@ torch.set_anomaly_enabled(True)
 
 ### Training Loop
 for epoch in range(num_epochs):
-    kl_beta = 4
+    kl_beta = 5
 
     dataloader_iterations = int(len(train_data) / batch_size)
     curr_stats = np.zeros((dataloader_iterations, 3))
 
     for i, x in enumerate(dataloader):
-        print(f'batch number {i} out of {dataloader_iterations}')
+        print(f'batch number {i+1} out of {dataloader_iterations}')
         optimizer.zero_grad()
         mu, log_var, log_spike, sampled_z, x_hat = vae(x)
 
@@ -198,7 +201,6 @@ for epoch in range(num_epochs):
                * log(1 - x) - ln_B).sum(1).mean()
 
         spike = torch.clamp(log_spike.exp(), eps, 1.0 - eps) 
-        alpha = 0.6
         prior1 = -0.5 * torch.sum(spike.mul(1 + log_var - mu.pow(2) - log_var.exp()))
         prior21 = (1 - spike).mul(torch.log((1 - spike) / (1 - alpha)))
         prior22 = spike.mul(torch.log(spike / alpha))
@@ -220,7 +222,8 @@ for epoch in range(num_epochs):
     fig, axs = plt.subplots(3, 3)
     for ax in axs.flatten():
         rand_z = torch.randn((1, latent_size))
-        generation = vae.decode(rand_z)
+        mask = torch.rand((1, latent_size)) > alpha
+        generation = vae.decode(rand_z[mask])
         ax.imshow(generation.detach().reshape(68, 68, 3))
     plt.show()
 
@@ -256,21 +259,22 @@ vae.load_state_dict(torch.load("beta_bce"))
 #%%
 
 ## laver tilfældigt genererede billeder
+fig, axs = plt.subplots(3,3)
 random_zs = torch.randn((10, latent_size))
-for z in random_zs:
-    x_hat = vae.decode_as_np(z)
-    plt.imshow(x_hat.reshape(68, 68, 3))
-    plt.show()
+for ax, z in zip(axs.flatten(), random_zs):
+    x_hat = vae.decode(z)
+    ax.imshow(x_hat.detach().reshape(68, 68, 3))
+plt.show()
 # %%
 
 ## laver en rekonstruktion af et tilfældigt ansigt
-random_faces = train_data[np.random.randint(len(train_data))].view(1,-1)
+random_cells = train_data[np.random.randint(len(train_data))].view(1,-1)
 fig, ax = plt.subplots(1,2)
-for face in random_faces:
-    mu, _ = vae.encoder(torch.tensor(face))
-    decoding = vae.decode_as_np(torch.tensor(mu))
-    ax[0].imshow(face.reshape(68, 68, 3))
-    ax[1].imshow(decoding.reshape(68, 68, 3))
+for cell in random_cells:
+    z = vae.encode(torch.tensor(cell).view(1,-1))
+    decoding = vae.decode(z)
+    ax[0].imshow(cell.reshape(68, 68, 3))
+    ax[1].imshow(decoding[0].detach().reshape(68, 68, 3))
     
     ax[0].set_title("Real")
     ax[1].set_title("Reconstruction")    
@@ -280,13 +284,13 @@ for face in random_faces:
 ## ændrer på en latent variabel over tid
 fig, axs = plt.subplots(5,5)
 idx = np.random.randint(len(train_data))
-random_face = train_data[idx]
-mu = vae.encode_as_np(random_face)
+random_cell = train_data[idx]
+z = vae.encode(random_cell)
 space = np.linspace(-2, 2, 25)
 encoding_idx = 0
 for i, ax in zip(space, axs.flatten()):
-    mu[0, 2] = i
-    decoding = vae.decode_as_np(torch.tensor(mu))
+    z[0, 2] = i
+    decoding = vae.decode(z)
     ax.imshow(decoding.reshape(68, 68, 3))
     ax.set_xticks([])
     ax.set_yticks([])
@@ -298,8 +302,8 @@ plt.savefig("Changing feature", dpi=300)
 ## interpolerer mellem to billeder
 randomface1 = train_data[np.random.randint(len(train_data))]
 randomface2 = train_data[np.random.randint(len(train_data))]
-encoding1, _ = vae.encoder(randomface1)
-encoding2, _ = vae.encoder(randomface2)
+encoding1 = vae.encode(randomface1)
+encoding2 = vae.encode(randomface2)
 
 fig, axs = plt.subplots(1,2)
 axs[0].imshow(randomface1.view(68,68,3))
@@ -311,7 +315,9 @@ fig, axs = plt.subplots(4,4)
 for i, ax in enumerate(axs.flatten()):
     step = i / 16 * retning
     new_z = encoding1 + step
-    generated_face = vae.decode_as_np(new_z)
+    generated_face = vae.decode(new_z)
     ax.imshow(generated_face.reshape(68,68,3))
+    ax.set_xticks([])
+    ax.set_yticks([])
     
 plt.savefig("interpolations", dpi=300)
