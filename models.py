@@ -62,10 +62,9 @@ class Decoder(torch.nn.Module):
 
 
 class VAE(torch.nn.Module):
-    def __init__(self, encoder, decoder, kl_beta=1):
+    def __init__(self, encoder, decoder):
         super(VAE, self).__init__()
 
-        self.kl_beta = kl_beta
         self.latent_size = encoder.latent_size
 
         self.encoder = encoder
@@ -83,14 +82,36 @@ class VAE(torch.nn.Module):
         x_hat = self.decoder(sampled_z)
 
         return mu, log_var, x_hat
+    
+    def reconstruction_loss(self, x_hat, x_recon, distribution = "beta"):
+        if distribution == "beta":
+            eps = 1e-6
+            x_recon = torch.clamp(x_recon, eps, 1-eps)
+            x_hat = torch.clamp(x_hat, eps, 1 - eps)
 
-    def train(self, num_epochs, dataloader, verbose=1, learning_rate=0.001, reconstruction="beta", callback=None):
+            precision = 100
+            alfa = precision * x_hat
+            beta = precision * (1 - x_hat)
+
+            ln_B = lgamma(alfa) + lgamma(beta) - \
+                lgamma(torch.tensor(precision))
+                
+            Re = -((alfa - 1) * log(x_recon) + 
+                   (beta - 1) * log(1 - x_recon) -
+                   ln_B).sum(1).mean()
+            
+        elif distribution == "normal":
+            Re = torch.pow(x_hat - x_recon, 2).sum(1).mean()
+        
+        return Re
+            
+
+    def train(self, num_epochs, dataloader, kl_beta = 1, verbose=1, distribution="beta", callback=None):
         self.stats = np.zeros((num_epochs, 3))
-        optimizer = optim.Adam(self.parameters(), lr=learning_rate)
+        optimizer = optim.Adam(self.parameters())
 
         # for debugging
         torch.set_anomaly_enabled(True)
-        eps = 1e-6
 
         # Training Loop
         for epoch in range(num_epochs):
@@ -103,26 +124,10 @@ class VAE(torch.nn.Module):
                 optimizer.zero_grad()
                 mu, log_var, x_hat = self(x_recon)
 
-                x_recon = torch.clamp(x_recon, eps, 1-eps)
-                x_hat = torch.clamp(x_hat, eps, 1 - eps)
-
-                precision = 100
-                alfa = precision * x_hat
-                beta = precision * (1 - x_hat)
-
-                if reconstruction == "beta":
-                    ln_B = lgamma(alfa) + lgamma(beta) - \
-                        lgamma(torch.tensor(precision))
-                    Re = -((alfa - 1) * log(x_recon) +
-                           (beta - 1) * log(1 - x_recon)
-                           - ln_B).sum(1).mean()
-
-                elif reconstruction == "normal":
-                    Re = torch.pow(x_hat - x_recon, 2).sum(1).mean()
-
+                Re = self.reconstruction_loss(x_hat, x_recon, distribution)
                 kl = (-0.5 * (1 + log_var - mu ** 2 - log_var.exp())).sum(1).mean()
 
-                loss = Re + self.kl_beta * kl
+                loss = Re + kl_beta * kl
                 loss.backward()
                 optimizer.step()
 
@@ -132,7 +137,7 @@ class VAE(torch.nn.Module):
             self.stats[epoch, :] = epoch_stats
 
             if verbose:
-                print(f"Beta = {self.kl_beta}     epoch = {epoch}")
+                print(f"Beta = {kl_beta}     epoch = {epoch + 1}")
                 print(*epoch_stats, "\n")
 
             if callback is not None:

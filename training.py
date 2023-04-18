@@ -13,10 +13,10 @@ dataloader = torch.utils.data.DataLoader(
     train_data, batch_size=128,
     drop_last=True, shuffle=True)
 
-encoder = Encoder(800)
-decoder = Decoder(800)
+encoder = Encoder(latent_size)
+decoder = Decoder(latent_size)
 
-vae = VAE(encoder, decoder, kl_beta=5)
+vae = VAE(encoder, decoder)
 plots = Graphics(vae, train_data)
 
 def callback():
@@ -24,7 +24,7 @@ def callback():
     plots.reconstructions()
     plots.show_convergence()
 
-stats = vae.train(60, dataloader, verbose=1, callback=callback)
+stats = vae.train(60, dataloader, kl_beta=1, verbose=1, distribution="normal", callback=callback)
 
 plots.interpolate()
 plots.investigate_feature()
