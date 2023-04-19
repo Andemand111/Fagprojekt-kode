@@ -167,7 +167,7 @@ for epoch in range(num_epochs):
     epoch_stats = np.zeros((dataloader_iterations, 3))
 
     for i, x in enumerate(dataloader):
-        #print(f'batch number {i} out of {dataloader_iterations}')
+        print(f'batch number {i} out of {dataloader_iterations}')
         optimizer.zero_grad()
         mu, log_var, sampled_z, x_hat = vae(x)
         std = torch.exp(0.5 * log_var)
