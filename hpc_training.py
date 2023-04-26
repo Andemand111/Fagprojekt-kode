@@ -1,6 +1,8 @@
 from models import Encoder, Decoder, VAE
 import numpy as np
 import torch
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 latent_size = 500
 
@@ -20,7 +22,7 @@ class Cells():
         RGBmax = np.max(sample,axis=0)
         sample /= RGBmax
         
-        sample = torch.from_numpy(sample).flatten()
+        sample = torch.from_numpy(sample).flatten().to(device)
         return sample
     
 train_data = Cells()
@@ -32,7 +34,7 @@ dataloader = torch.utils.data.DataLoader(
 encoder = Encoder(latent_size)
 decoder = Decoder(latent_size)
 
-vae = VAE(encoder, decoder)
+vae = VAE(encoder, decoder).to(device)
 
 stats = vae.train(60, dataloader, kl_beta=3, verbose = 1)
 vae.save_model("betavae")
