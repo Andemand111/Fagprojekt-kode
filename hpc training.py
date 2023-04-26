@@ -1,7 +1,5 @@
 from dataset import Cells
 from models import Encoder, Decoder, VAE
-from graphics import Graphics
-
 import numpy as np
 import torch
 
@@ -17,7 +15,6 @@ encoder = Encoder(latent_size)
 decoder = Decoder(latent_size)
 
 vae = VAE(encoder, decoder)
-plots = Graphics(vae, train_data)
 
 stats = vae.train(60, dataloader, kl_beta=3)
 vae.save_model("betavae")

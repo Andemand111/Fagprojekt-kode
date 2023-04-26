@@ -3,61 +3,82 @@ import numpy as np
 import torch.optim as optim
 from torch import log, lgamma
 import torch.nn as nn
+from torch.nn import functional as F
 
 
 class Encoder(torch.nn.Module):
+    """  Encoder class for VAE
+
+    Arguments:
+    latent_size : integer, the amount of latent variables in bottleneck
+
+    Functions:
+        forward:
+            arguments:
+                x :             a data matrix (n x 13872)
+
+            returns: 
+                mu, log_var:    the location and log scale of the distribution
+                                of the latent variables
+
+        """
+
     def __init__(self, latent_size):
         super(Encoder, self).__init__()
 
         self.latent_size = latent_size
 
-        encoder_network = nn.Sequential(
-            nn.Conv2d(3, 32, kernel_size=(3, 3), stride=2, padding=1),
-            nn.LeakyReLU(),
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=(3, 3), stride=2, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=(3, 3), stride=2, padding=1)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=(3, 3), stride=2, padding=1)
+        self.lin1 = nn.Linear(10368, 2048)
 
-            nn.Conv2d(32, 64, kernel_size=(3, 3), stride=2, padding=1),
-            nn.LeakyReLU(),
-
-            nn.Conv2d(64, 128, kernel_size=(3, 3), stride=2, padding=1),
-            nn.LeakyReLU(),
-
-            nn.Flatten(),
-
-            nn.Linear(10368, 2048),
-            nn.LeakyReLU(),
-
-            nn.Linear(2048, 2 * latent_size)
-        )
-
-        self.network = encoder_network
+        self.mu_lin = nn.Linear(2048, latent_size)
+        self.log_var_lin = nn.Linear(2048, latent_size)
 
     def forward(self, x):
         x_reshaped = x.view(-1, 68, 68, 3).permute(0, 3, 1, 2)
-        z = self.network(x_reshaped)
-        mu, log_var = torch.chunk(z, 2, 1)
+        z = F.relu(self.conv1(x_reshaped))
+        z = F.relu(self.conv2(z))
+        z = F.relu(self.conv3(z))
+        z = torch.flatten(z, start_dim=1)
+        z = F.relu(self.lin1(z))
+
+        mu = self.mu_lin(z)
+        log_var = self.log_var_lin(z)
 
         return mu, log_var
 
 
 class Decoder(torch.nn.Module):
+    """  Decoder class for VAE
+
+    Arguments:
+    latent_size : integer, the amount of latent variables in bottleneck
+
+    Functions:
+        forward:
+            arguments:
+                z :             a matrix of latent variables (n x latent_size)
+
+            returns: 
+                x_hat:          a data matrix (n x 13872); the reconstruced image 
+                                given z (or rather a distribution parameter for each 
+                                pixel value)
+
+    """
+
     def __init__(self, latent_size):
         super(Decoder, self).__init__()
 
-        decoder_network = nn.Sequential(
-            nn.Linear(latent_size, 2048),
-            nn.LeakyReLU(),
-
-            nn.Linear(2048, 4096),
-            nn.LeakyReLU(),
-
-            nn.Linear(4096, 68 * 68 * 3),
-            nn.Sigmoid(),
-        )
-
-        self.network = decoder_network
+        self.lin1 = nn.Linear(latent_size, 2048)
+        self.lin2 = nn.Linear(2048, 4096)
+        self.lin3 = nn.Linear(4096, 68 * 68 * 3)
 
     def forward(self, z):
-        x_hat = self.network(z)
+        x_hat = F.relu(self.lin1(z))
+        x_hat = F.relu(self.lin2(x_hat))
+        x_hat = torch.sigmoid(self.lin3(x_hat))
         return x_hat
 
 
@@ -82,31 +103,34 @@ class VAE(torch.nn.Module):
         x_hat = self.decoder(sampled_z)
 
         return mu, log_var, x_hat
-    
-    def reconstruction_loss(self, x_hat, x_recon, distribution = "beta"):
+
+    def reconstruction_loss(self, x_hat, x_recon, distribution="beta", sigma=1):
         if distribution == "beta":
             eps = 1e-6
             x_recon = torch.clamp(x_recon, eps, 1-eps)
             x_hat = torch.clamp(x_hat, eps, 1 - eps)
 
-            precision = 100
-            alfa = precision * x_hat
-            beta = precision * (1 - x_hat)
+            kappa = 4  # må ikke være mindre end eller lig med - 2
+            alfa = x_hat * (kappa - 2) + 1
+            beta = (1 - x_hat) * (kappa - 2) + 1
 
             ln_B = lgamma(alfa) + lgamma(beta) - \
-                lgamma(torch.tensor(precision))
-                
-            Re = -((alfa - 1) * log(x_recon) + 
+                lgamma(torch.tensor(kappa))
+
+            Re = -((alfa - 1) * log(x_recon) +
                    (beta - 1) * log(1 - x_recon) -
                    ln_B).sum(1).mean()
-            
-        elif distribution == "normal":
-            Re = torch.pow(x_hat - x_recon, 2).sum(1).mean()
-        
-        return Re
-            
 
-    def train(self, num_epochs, dataloader, kl_beta = 1, verbose=1, distribution="beta", callback=None):
+        elif distribution == "normal":
+            n = x_hat.shape[1]
+            var = sigma ** 2
+            mse = ((x_hat - x_recon) ** 2).sum(1).mean() / var
+            const = n * log(torch.tensor(2 * torch.pi * var))
+            Re = 0.5 * (const + mse)
+
+        return Re
+
+    def train(self, num_epochs, dataloader, kl_beta=1, verbose=2, distribution="beta", sigma=1, callback=None, callback_args={}):
         self.stats = np.zeros((num_epochs, 3))
         optimizer = optim.Adam(self.parameters())
 
@@ -124,8 +148,10 @@ class VAE(torch.nn.Module):
                 optimizer.zero_grad()
                 mu, log_var, x_hat = self(x_recon)
 
-                Re = self.reconstruction_loss(x_hat, x_recon, distribution)
-                kl = (-0.5 * (1 + log_var - mu ** 2 - log_var.exp())).sum(1).mean()
+                Re = self.reconstruction_loss(
+                    x_hat, x_recon, distribution, sigma)
+                kl = 0.5 * (log_var.exp() + mu ** 2 -
+                            1 - log_var).sum(1).mean()
 
                 loss = Re + kl_beta * kl
                 loss.backward()
@@ -141,9 +167,17 @@ class VAE(torch.nn.Module):
                 print(*epoch_stats, "\n")
 
             if callback is not None:
-                callback()
+                callback(*callback_args)
 
         return self.stats
+
+    def save_model(self, filename):
+        torch.save(self.state_dict(), filename)
+        print("Model saved!")
+
+    def load_model(self, filename):
+        self.load_state_dict(torch.load(filename))
+        print("Model loaded!")
 
     def encode(self, x):
         mu, log_var = self.encoder(x)

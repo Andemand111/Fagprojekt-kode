@@ -19,5 +19,6 @@ decoder = Decoder(latent_size)
 vae = VAE(encoder, decoder)
 plots = Graphics(vae, train_data)
 
-stats = vae.train(60, dataloader, kl_beta=3)
-vae.save_model("betavae")
+vae.load_model("betavae")
+
+#%%

@@ -7,6 +7,7 @@ class Graphics:
     def __init__(self, model, data):
         self.model = model
         self.data = data
+        self.latent_size = model.latent_size
     
     def random_generations(self, filename=""):
         fig, axs = plt.subplots(3, 3)
@@ -91,4 +92,18 @@ class Graphics:
         if filename:
             plt.savefig(filename, dpi=300)  
             
+        plt.show()
+    
+    def plot_encoding(self, idx = 0, filename=""):
+        eps = 1e-6
+        x_hat = self.data[idx]
+        z = self.model.encode(x_hat)
+        plt.bar(np.arange(self.latent_size), z.flatten())
+        mask = (-eps < z.flatten()) & (z.flatten() < eps).int()
+        alpha_hat = np.mean(mask.numpy())
+        plt.title(rf"$\alpha = {alpha_hat}$")
+        
+        if filename:
+            plt.savefig(filename, dpi=300)
+        
         plt.show()
