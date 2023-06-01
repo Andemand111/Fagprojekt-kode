@@ -5,17 +5,18 @@ from torch.utils.data import DataLoader
 import numpy as np
 import torch
 
-device = torch.device("cude:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 big_latent_size = 700
 small_latent_size = 100
 
-data = np.load("celle_data.npy")
 
-rgb_data = Cells(data, device=device)
-r_data = Cells(data, channel=0, device=device)
-g_data = Cells(data, channel=1, device=device)
-b_data = Cells(data, channel=2, device=device)
+path = "/zhome/5a/2/167858/Desktop/merged_files/" # path to data
+
+rgb_data = Cells(path=path, device=device)
+r_data = Cells(path=path, channel=0, device=device)
+g_data = Cells(path=path, channel=1, device=device)
+b_data = Cells(path=path, channel=2, device=device)
 
 args = dict(batch_size=128, drop_last=True, shuffle=True)
 rgb_dataloader = dataloader = DataLoader(rgb_data, **args)
