@@ -1,4 +1,4 @@
-from dataset import SmallCells
+from dataset import Cells
 from models import VAE
 from torch.utils.data import DataLoader
 
@@ -12,10 +12,10 @@ small_latent_size = 100
 
 data = np.load("celle_data.npy")
 
-rgb_data = SmallCells(data, device=device)
-r_data = SmallCells(data, channel=0, device=device)
-g_data = SmallCells(data, channel=1, device=device)
-b_data = SmallCells(data, channel=2, device=device)
+rgb_data = Cells(data, device=device)
+r_data = Cells(data, channel=0, device=device)
+g_data = Cells(data, channel=1, device=device)
+b_data = Cells(data, channel=2, device=device)
 
 args = dict(batch_size=128, drop_last=True, shuffle=True)
 rgb_dataloader = dataloader = DataLoader(rgb_data, **args)
