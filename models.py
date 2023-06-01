@@ -113,7 +113,7 @@ class VAE(nn.Module):
             eps = 1e-6
             x_recon = torch.clamp(x_recon, eps, 1-eps)
             x_hat = torch.clamp(x_hat, eps, 1 - eps)
-
+            
             kappa = 4  # må ikke være mindre end eller lig med - 2
             alfa = x_hat * (kappa - 2) + 1
             beta = (1 - x_hat) * (kappa - 2) + 1
