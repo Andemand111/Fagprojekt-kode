@@ -25,4 +25,7 @@ r_model = VAE(small_latent_size, num_channels=1)
 g_model = VAE(small_latent_size, num_channels=1)
 b_model = VAE(small_latent_size, num_channels=1)
 
-r_stats = r_model.train(10, r_dataloader, kl_beta = 3)
+rgb_stats = rgb_model.train(45, rgb_dataloader, kl_beta = 3)
+r_stats = r_model.train(45, r_dataloader, kl_beta = 3)
+g_stats = g_model.train(45, g_dataloader, kl_beta = 3)
+b_stats = b_model.train(45, b_dataloader, kl_beta = 3)
