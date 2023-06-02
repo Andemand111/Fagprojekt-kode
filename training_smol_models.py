@@ -16,24 +16,24 @@ g_data = Cells(path=path, channel=1, device=device)
 b_data = Cells(path=path, channel=2, device=device)
 
 args = dict(batch_size=128, drop_last=True, shuffle=True)
-r_dataloader = dataloader = DataLoader(r_data, **args)
-g_dataloader = dataloader = DataLoader(g_data, **args)
-b_dataloader = dataloader = DataLoader(b_data, **args)
+r_dataloader = DataLoader(r_data, **args)
+g_dataloader = DataLoader(g_data, **args)
+b_dataloader = DataLoader(b_data, **args)
 
 r_model = VAE(small_latent_size, num_channels=1).to(device)
-r_model.save_model("r_model")
 r_stats = r_model.train(45, r_dataloader, kl_beta = 3, verbose=1)
+np.save("r_model_stats", r_stats)
+r_model.save_model("r_model")
 
 
 g_model = VAE(small_latent_size, num_channels=1).to(device)
 g_stats = g_model.train(45, g_dataloader, kl_beta = 3, verbose=1)
+np.save("g_model_stats", g_stats)
 g_model.save_model("g_model")
 
 
 b_model = VAE(small_latent_size, num_channels=1).to(device)
 b_stats = b_model.train(45, b_dataloader, kl_beta = 3, verbose=1)
+np.save("b_model_stats", b_stats)
 b_model.save_model("b_model")
 
-np.save("r_model_stats", r_stats)
-np.save("g_model_stats", g_stats)
-np.save("b_model_stats", b_stats)
