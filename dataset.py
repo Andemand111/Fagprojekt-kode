@@ -25,7 +25,7 @@ class SmallCells(Dataset):
             sample = sample[:, :, self.channel]
 
         if self.device is not None:
-            sample.to(self.device)
+            sample = sample.to(self.device)
 
         sample = torch.from_numpy(sample).flatten().float()
         return sample
@@ -53,7 +53,7 @@ class Cells(Dataset):
             sample = sample[:, :, self.channel]
 
         if self.device is not None:
-            sample.to(self.device)
+            sample = sample.to(self.device)
 
         sample = torch.from_numpy(sample).flatten().float()
         return sample
@@ -78,12 +78,12 @@ class ClassifyCells(Dataset):
 
         # divide by max value in each channel
         sample /= np.amax(sample, axis=(0, 1))
-        sample = torch.from_numpy(sample).flatten()
-        
+        sample = torch.from_numpy(sample).flatten().float()
+
         X = torch.zeros(1000)
-        X[0:700] = self.models[0].encode(sample).flatten()
-        X[700:800] = self.models[1].encode(sample).flatten()
-        X[800:900] = self.models[2].encode(sample).flatten()
-        X[900:1000] = self.models[3].encode(sample).flatten()
+        X[0:700]    = self.models[0].encode(sample).flatten()
+        X[700:800]  = self.models[1].encode(sample[:, :, 0]).flatten()
+        X[800:900]  = self.models[2].encode(sample[:, :, 1]).flatten()
+        X[900:1000] = self.models[3].encode(sample[:, :, 2]).flatten()
 
         return X, y
