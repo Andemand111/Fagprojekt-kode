@@ -3,7 +3,6 @@ import numpy as np
 from torch import log, lgamma
 import torch.nn as nn
 from torch.nn import functional as F
-from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 class Encoder(torch.nn.Module):
@@ -114,7 +113,7 @@ class VAE(nn.Module):
             x_recon = torch.clamp(x_recon, eps, 1-eps)
             x_hat = torch.clamp(x_hat, eps, 1 - eps)
             
-            kappa = 4  # må ikke være mindre end eller lig med - 2
+            kappa = 4  # må ikke være mindre end eller lig med 2
             alfa = x_hat * (kappa - 2) + 1
             beta = (1 - x_hat) * (kappa - 2) + 1
 
@@ -126,15 +125,12 @@ class VAE(nn.Module):
                    ln_B).sum(1).mean()
 
         elif distribution == "normal":
-            n = x_hat.shape[1]
             var = sigma ** 2
-            mse = ((x_hat - x_recon) ** 2).sum(1).mean() / var
-            const = n * log(torch.tensor(2 * torch.pi * var))
-            Re = 0.5 * (const + mse)
-
+            Re = ((x_hat - x_recon) ** 2).sum(1).mean() / (2 * var)
+            
         return Re
 
-    def train(self, num_epochs, dataloader, kl_beta=1, verbose=2, distribution="beta", sigma=1, callback=None, callback_args={}):
+    def train(self, num_epochs, dataloader, kl_beta=1, verbose=2, distribution="beta", sigma=1, callback=None, callback_args=dict()):
         self.stats = np.zeros((num_epochs, 3))
         optimizer = torch.optim.Adam(self.parameters())
 
@@ -172,7 +168,7 @@ class VAE(nn.Module):
                 print(*epoch_stats, "\n")
 
             if callback is not None:
-                callback(*callback_args)
+                callback(**callback_args)
 
         return self.stats
 
@@ -181,10 +177,8 @@ class VAE(nn.Module):
         print("Model saved!")
 
     def load_model(self, filename, device="cpu"):
-        if device=="cpu":    
-            self.load_state_dict(torch.load(filename, map_location=torch.device('cpu')))
-        else:
-            self.load_state_dict(torch.load(filename))
+        map_location = device  
+        self.load_state_dict(torch.load(filename, map_location=map_location))
         print("Model loaded!")
 
     def encode(self, x):
@@ -202,9 +196,9 @@ class ClassifyNN(nn.Module):
     def __init__(self, num_features):
         super(ClassifyNN, self).__init__()
         
-        self.lin1 = nn.Linear(num_features, 1024)
-        self.lin2 = nn.Linear(1024, 512)
-        self.lin3 = nn.Linear(512, 13)
+        self.lin1 = nn.Linear(num_features, 2048)
+        self.lin2 = nn.Linear(2048, 512)
+        self.lin3 = nn.Linear(512, 12)
 
     def forward(self, x):
         y = F.relu(self.lin1(x))
@@ -212,18 +206,18 @@ class ClassifyNN(nn.Module):
         y = F.softmax(self.lin3(y), 1)
         return y
 
-    def train(self, num_epochs, dataloader, verbose=2):
-        self.stats = np.zeros(num_epochs)
+    def train(self, num_epochs, dataloader, eval_data, verbose=2):
+        self.stats = np.zeros(num_epochs, 2)
         optimizer = torch.optim.Adam(self.parameters())
         
         for epoch in range(num_epochs):
-            curr_stats = np.zeros(len(dataloader))
+            curr_loss = np.zeros(len(dataloader))
             
             for i, (X, y) in enumerate(dataloader):                
                 preds = self(X)
-                y = F.one_hot(y.long(), 13).float()
+                y = F.one_hot(y.long(), 12).float()
                 loss = F.binary_cross_entropy(preds, y)
-                curr_stats[i] = loss.item()
+                curr_loss[i] = loss.item()
 
                 loss.backward()
                 optimizer.step()
@@ -231,17 +225,19 @@ class ClassifyNN(nn.Module):
                 if verbose == 2:
                     print(f"Batch {i + 1} out of {len(dataloader)}")
             
-            epoch_stats = np.mean(curr_stats)
-            self.stats[epoch] = epoch_stats
+            epoch_loss = np.mean(curr_loss)
+            eval_loss = self.evaluate(eval_data)
+            self.stats[epoch, :] = [epoch_loss, eval_loss]
             
             if verbose:
                 print(f"Epoch: {epoch + 1} / {num_epochs}")
-                print(f"loss: {epoch_stats} \n")
+                print(f"loss: {epoch_loss} \n")
                 plt.plot(self.stats)
                 plt.show()
+        
+        return self.stats
 
     def test(self, data):
-        pbar = tqdm(total = len(data))
         res = torch.zeros(len(data))
         
         print("testing classification model..")
@@ -251,12 +247,21 @@ class ClassifyNN(nn.Module):
             pred = pred.argmax(1).item()
             
             res[i] = (pred == y).astype(np.int64)
-            pbar.update(1)
             
         print("... done!")
         
         accuracy = res.mean()
         return accuracy
+    
+    def evaluate(self, data):
+        losses = torch.zeros(len(data))
+        for i in range(len(data)):
+            X, y = data[i]
+            pred = self(X)
+            y = F.one_hot(y.long(), 12).float()
+            loss = F.binary_cross_entropy(pred, y)
+            losses[i] = loss.item()
+        return losses.mean()
                 
     def save_model(self, filename):
         torch.save(self.state_dict(), filename)
