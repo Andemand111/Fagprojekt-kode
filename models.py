@@ -107,7 +107,7 @@ class VAE(nn.Module):
 
         return mu, log_var, x_hat
 
-    def reconstruction_loss(self, x_hat, x_recon, distribution="beta", kappa=4, sigma=1):
+    def reconstruction_loss(self, x_hat, x_recon, distribution="beta", kappa=3.47, sigma=0.229):
         if distribution == "beta":
             eps = 1e-6
             x_recon = torch.clamp(x_recon, eps, 1-eps)
@@ -119,13 +119,15 @@ class VAE(nn.Module):
             ln_B = lgamma(alfa) + lgamma(beta) - \
                 lgamma(torch.tensor(kappa))
 
-            Re = -((alfa - 1) * log(x_recon) +
+            Re = - ((alfa - 1) * log(x_recon) +
                    (beta - 1) * log(1 - x_recon) -
                    ln_B).sum(1).mean()
 
         elif distribution == "normal":
             var = sigma ** 2
-            Re = ((x_hat - x_recon) ** 2).sum(1).mean() / (2 * var)
+            distance = ((x_hat - x_recon) ** 2).sum(1).mean() / (2 * var)
+            const = 0.5 * 68**2 * self.num_channels * log(2 * torch.pi * var) 
+            Re = distance + const
             
         return Re
     
@@ -133,14 +135,14 @@ class VAE(nn.Module):
         kl = 0.5 * (log_var.exp() + mu ** 2 - 1 - log_var).sum(1).mean()
         return kl
     
-    def ELBO(self, x_recon, distribution = "beta", kappa = 4, sigma = 1, kl_beta = 1):
+    def ELBO(self, x_recon, distribution = "beta", kappa = 3.47, sigma = 0.229, kl_beta = 1):
         mu, log_var, x_hat = self(x_recon)
         re = self.reconstruction_loss(x_hat, x_recon, distribution, kappa, sigma)
         kl = self.kl_divergence(log_var, mu)
         loss = re + kl_beta * kl
         return  loss, re, kl
 
-    def train(self, num_epochs, dataloader, kl_beta=1, verbose=2, distribution="beta", kappa=4, sigma=0.214, callback=None, callback_args=dict()):
+    def train(self, num_epochs, dataloader, kl_beta=1, verbose=2, distribution="beta", kappa=3.47, sigma=0.229, callback=None, callback_args=dict()):
         self.stats = np.zeros((num_epochs, 3))
         optimizer = torch.optim.Adam(self.parameters())
 
@@ -181,7 +183,8 @@ class VAE(nn.Module):
         print("Model saved!")
 
     def load_model(self, filename, device="cpu"):
-        self.load_state_dict(torch.load(filename, map_location=device))
+        map_location = device  
+        self.load_state_dict(torch.load(filename, map_location=map_location))
         print("Model loaded!")
 
     def encode(self, x):
@@ -209,19 +212,17 @@ class ClassifyNN(nn.Module):
         y = F.softmax(self.lin3(y), 1)
         return y
 
-    def train(self, num_epochs, dataloader, val_data, verbose=2):
-        self.stats = np.zeros((num_epochs, 2))
+    def train(self, num_epochs, dataloader, eval_data, verbose=2):
+        self.stats = np.zeros(num_epochs, 2)
         optimizer = torch.optim.Adam(self.parameters())
         
         for epoch in range(num_epochs):
             curr_loss = np.zeros(len(dataloader))
             
-            for i, (X, y) in enumerate(dataloader):  
-                optimizer.zero_grad()
-                
+            for i, (X, y) in enumerate(dataloader):                
                 preds = self(X)
                 y = F.one_hot(y.long(), 12).float()
-                loss = self.loss(y, preds)
+                loss = F.binary_cross_entropy(preds, y)
                 curr_loss[i] = loss.item()
 
                 loss.backward()
@@ -231,21 +232,16 @@ class ClassifyNN(nn.Module):
                     print(f"Batch {i + 1} out of {len(dataloader)}")
             
             epoch_loss = np.mean(curr_loss)
-            val_loss = self.evaluate(val_data)
-            self.stats[epoch, :] = [epoch_loss, val_loss]
+            eval_loss = self.evaluate(eval_data)
+            self.stats[epoch, :] = [epoch_loss, eval_loss]
             
             if verbose:
                 print(f"Epoch: {epoch + 1} / {num_epochs}")
                 print(f"loss: {epoch_loss} \n")
-                plt.plot(self.stats[:epoch + 1, 0], label="training loss")
-                plt.plot(self.stats[:epoch + 1, 1], label="validation loss")
-                plt.legend()
+                plt.plot(self.stats)
                 plt.show()
         
         return self.stats
-
-    def loss(self, x_recon, x_hat):
-        return F.binary_cross_entropy(x_hat, x_recon)
 
     def test(self, data):
         res = torch.zeros(len(data))
@@ -255,28 +251,25 @@ class ClassifyNN(nn.Module):
         for i, (X, y) in enumerate(data):
             pred = self(X.view(1, -1))
             pred = pred.argmax(1).item()
-            res[i] = (pred == y).long()
+            
+            res[i] = (pred == y).astype(np.int64)
             
         print("... done!")
         
         accuracy = res.mean()
-        return accuracy.item()
+        return accuracy
     
     def evaluate(self, data):
         losses = torch.zeros(len(data))
         for i in range(len(data)):
             X, y = data[i]
-            pred = self(X.view(1, -1))
-            y = F.one_hot(y.long().flatten(), 12).float()
-            loss = self.loss(y, pred)
+            pred = self(X)
+            y = F.one_hot(y.long(), 12).float()
+            loss = F.binary_cross_entropy(pred, y)
             losses[i] = loss.item()
         return losses.mean()
                 
     def save_model(self, filename):
         torch.save(self.state_dict(), filename)
         print("Model saved!")
-        
-    def load_model(self, filename, device="cpu"):
-        self.load_state_dict(torch.load(filename, map_location=device))
-        print("Model loaded!")
         
