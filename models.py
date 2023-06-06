@@ -107,13 +107,12 @@ class VAE(nn.Module):
 
         return mu, log_var, x_hat
 
-    def reconstruction_loss(self, x_hat, x_recon, distribution="beta", sigma=1):
+    def reconstruction_loss(self, x_hat, x_recon, distribution="beta", kappa=4, sigma=1):
         if distribution == "beta":
             eps = 1e-6
             x_recon = torch.clamp(x_recon, eps, 1-eps)
             x_hat = torch.clamp(x_hat, eps, 1 - eps)
             
-            kappa = 4  # må ikke være mindre end eller lig med 2
             alfa = x_hat * (kappa - 2) + 1
             beta = (1 - x_hat) * (kappa - 2) + 1
 
@@ -129,8 +128,19 @@ class VAE(nn.Module):
             Re = ((x_hat - x_recon) ** 2).sum(1).mean() / (2 * var)
             
         return Re
+    
+    def kl_divergence(self, log_var, mu):
+        kl = 0.5 * (log_var.exp() + mu ** 2 - 1 - log_var).sum(1).mean()
+        return kl
+    
+    def ELBO(self, x_recon, distribution = "beta", kappa = 4, sigma = 1, kl_beta = 1):
+        mu, log_var, x_hat = self(x_recon)
+        re = self.reconstruction_loss(x_hat, x_recon, distribution, kappa, sigma)
+        kl = self.kl_divergence(log_var, mu)
+        loss = re + kl_beta * kl
+        return  loss, re, kl
 
-    def train(self, num_epochs, dataloader, kl_beta=1, verbose=2, distribution="beta", sigma=1, callback=None, callback_args=dict()):
+    def train(self, num_epochs, dataloader, kl_beta=1, verbose=2, distribution="beta", kappa=4, sigma=0.214, callback=None, callback_args=dict()):
         self.stats = np.zeros((num_epochs, 3))
         optimizer = torch.optim.Adam(self.parameters())
 
@@ -146,19 +156,13 @@ class VAE(nn.Module):
                     print(f'batch number {i+1} out of {len(dataloader)}')
 
                 optimizer.zero_grad()
-                mu, log_var, x_hat = self(x_recon)
-
-                Re = self.reconstruction_loss(
-                    x_hat, x_recon, distribution, sigma)
-                kl = 0.5 * (log_var.exp() + mu ** 2 -
-                            1 - log_var).sum(1).mean()
-
-                loss = Re + kl_beta * kl
+                
+                loss, re, kl = self.ELBO(x_recon, distribution=distribution, kappa=kappa, sigma=sigma, kl_beta = kl_beta)
                 
                 loss.backward()
                 optimizer.step()
 
-                curr_stats[i, :] = [loss.item(), Re.item(), kl.item()]
+                curr_stats[i, :] = [loss.item(), re.item(), kl.item()]
 
             epoch_stats = np.mean(curr_stats, axis=0)
             self.stats[epoch, :] = epoch_stats
