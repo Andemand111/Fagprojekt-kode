@@ -4,19 +4,20 @@ import torch
 
 
 class Graphics:
-    def __init__(self, model, data, num_channels=3, cmap="viridis"):
+    def __init__(self, model, data, cmap="viridis"):
         self.model = model
         self.data = data
         self.latent_size = model.latent_size
-        self.num_channels = num_channels
-        self.cmap=cmap
+        self.num_channels = model.num_channels
+        self.cmap = cmap
 
     def random_generations(self, filename=""):
         fig, axs = plt.subplots(3, 3)
         for ax in axs.flatten():
             rand_z = torch.randn((1, self.model.latent_size))
             generation = self.model.decode(rand_z)
-            ax.imshow(generation.reshape(68, 68, self.num_channels), cmap=self.cmap)
+            ax.imshow(generation.reshape(
+                68, 68, self.num_channels), cmap=self.cmap)
             ax.set_xticks([])
             ax.set_yticks([])
 
@@ -31,8 +32,10 @@ class Graphics:
             cell = self.data[i]
             z = self.model.encode(cell)
             x_hat = self.model.decode(z)
-            ax[0].imshow(cell.reshape(68, 68, self.num_channels), cmap=self.cmap )
-            ax[1].imshow(x_hat.reshape(68, 68, self.num_channels), cmap=self.cmap)
+            ax[0].imshow(cell.reshape(
+                68, 68, self.num_channels), cmap=self.cmap)
+            ax[1].imshow(x_hat.reshape(
+                68, 68, self.num_channels), cmap=self.cmap)
 
         fig.set_size_inches(4, len(indxs) * 2)
 
@@ -62,7 +65,8 @@ class Graphics:
         for i, ax in zip(space, axs.flatten()):
             mu[0, feature_idx] = i
             decoding = self.model.decode(mu)
-            ax.imshow(decoding.reshape(68, 68, self.num_channels), cmap=self.cmap)
+            ax.imshow(decoding.reshape(
+                68, 68, self.num_channels), cmap=self.cmap)
             ax.set_xticks([])
             ax.set_yticks([])
 
@@ -85,7 +89,8 @@ class Graphics:
             step = i / 16 * retning
             new_z = encoding1 + step
             generated_face = self.model.decode(new_z)
-            ax.imshow(generated_face.reshape(68, 68, self.num_channels), cmap=self.cmap)
+            ax.imshow(generated_face.reshape(
+                68, 68, self.num_channels), cmap=self.cmap)
             ax.set_xticks([])
             ax.set_yticks([])
 
