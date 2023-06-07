@@ -61,34 +61,33 @@ class Cells(Dataset):
 
 class ClassifyCells(Dataset):
 
-    def __init__(self, path, models, indxs, labels, device=None):
+    def __init__(self, path, models, color_channels, indxs, labels):
         self.path = path
         self.models = models
+        self.color_channels = color_channels
         self.indxs = indxs
         self.labels = labels
-        self.device = device
 
     def __len__(self):
         return len(self.indxs)
 
     def __getitem__(self, idx):
         directory_idx = self.indxs[idx]
-
         y = self.labels[idx]
-        y = torch.tensor(y)
+        
         sample = np.load(self.path + str(directory_idx)).astype(np.float32)
 
         # divide by max value in each channel
         sample /= np.amax(sample, axis=(0, 1))
         sample = torch.from_numpy(sample).flatten().float()
         
-        X = torch.zeros(700)
-        X[0:700]    = self.models[0].encode(sample).flatten()
-        #X[700:800]  = self.models[1].encode(sample[:, :, 0]).flatten()
-        #X[800:900]  = self.models[2].encode(sample[:, :, 1]).flatten()
-        #X[900:1000] = self.models[3].encode(sample[:, :, 2]).flatten()
-
-        if self.device is not None:
-            X = X.to(self.device)
+        X = torch.tensor([])        
+        for model, channel in zip(self.models, self.color_channels):
+            if channel is not None:
+                encoding = model.encode(sample[:, :, channel])
+            else:
+                encoding  = model.encode(sample)
+            
+            X = torch.cat((X, encoding.flatten()))
 
         return X, y

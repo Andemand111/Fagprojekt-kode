@@ -211,8 +211,8 @@ class ClassifyNN(nn.Module):
         y = F.relu(self.lin2(y))
         y = F.softmax(self.lin3(y), 1)
         return y
-
-    def train(self, num_epochs, dataloader, eval_data, verbose=2):
+    
+    def train(self, num_epochs, dataloader, eval_data=None, verbose=2):
         self.stats = np.zeros(num_epochs, 2)
         optimizer = torch.optim.Adam(self.parameters())
         
@@ -232,7 +232,10 @@ class ClassifyNN(nn.Module):
                     print(f"Batch {i + 1} out of {len(dataloader)}")
             
             epoch_loss = np.mean(curr_loss)
-            eval_loss = self.evaluate(eval_data)
+            
+            if eval_data is not None:
+                eval_loss = self.evaluate(eval_data)
+                
             self.stats[epoch, :] = [epoch_loss, eval_loss]
             
             if verbose:
@@ -243,31 +246,13 @@ class ClassifyNN(nn.Module):
         
         return self.stats
 
-    def test(self, data):
-        res = torch.zeros(len(data))
+    def test(self, dataloader):
+        for X, y in dataloader:
+            preds = self(X)
+            preds = torch.argmax(preds, dim=1)
+            acc = torch.eq(y, preds).long().mean().item()
         
-        print("testing classification model..")
-        
-        for i, (X, y) in enumerate(data):
-            pred = self(X.view(1, -1))
-            pred = pred.argmax(1).item()
-            
-            res[i] = (pred == y).astype(np.int64)
-            
-        print("... done!")
-        
-        accuracy = res.mean()
-        return accuracy
-    
-    def evaluate(self, data):
-        losses = torch.zeros(len(data))
-        for i in range(len(data)):
-            X, y = data[i]
-            pred = self(X)
-            y = F.one_hot(y.long(), 12).float()
-            loss = F.binary_cross_entropy(pred, y)
-            losses[i] = loss.item()
-        return losses.mean()
+        return acc
                 
     def save_model(self, filename):
         torch.save(self.state_dict(), filename)

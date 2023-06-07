@@ -5,14 +5,14 @@ from torch.utils.data import DataLoader, WeightedRandomSampler, random_split
 import numpy as np
 
 rgb_model = VAE(700)
-#r_model = VAE(100, num_channels=1)
-#g_model = VAE(100, num_channels=1)
-#b_model = VAE(100, num_channels=1)
+r_model = VAE(100, num_channels=1)
+g_model = VAE(100, num_channels=1)
+b_model = VAE(100, num_channels=1)
 
 rgb_model.load_model("rgb_model_normal")
-# r_model.load_model("r_model")
-# g_model.load_model("g_model")
-# b_model.load_model("b_model")
+r_model.load_model("r_model")
+g_model.load_model("g_model")
+b_model.load_model("b_model")
 
 path = "C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/Data/singlecell/singh_cp_pipeline_singlecell_images/merged_files/"  # path to data
 indxs = np.load("moa_indices.npy")
