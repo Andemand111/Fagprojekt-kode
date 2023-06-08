@@ -4,7 +4,7 @@ from torch import log, lgamma
 import torch.nn as nn
 from torch.nn import functional as F
 import matplotlib.pyplot as plt
-
+from tqdm import tqdm
 class Encoder(torch.nn.Module):
     """  Encoder class for VAE
 
@@ -213,7 +213,7 @@ class ClassifyNN(nn.Module):
         return y
     
     def train(self, num_epochs, dataloader, eval_data=None, verbose=2):
-        self.stats = np.zeros(num_epochs, 2)
+        self.stats = np.zeros((num_epochs, 2))
         optimizer = torch.optim.Adam(self.parameters())
         
         for epoch in range(num_epochs):
@@ -232,9 +232,7 @@ class ClassifyNN(nn.Module):
                     print(f"Batch {i + 1} out of {len(dataloader)}")
             
             epoch_loss = np.mean(curr_loss)
-            
-            if eval_data is not None:
-                eval_loss = self.evaluate(eval_data)
+            eval_loss = self.evaluate(eval_data) if eval_data is not None else 0
                 
             self.stats[epoch, :] = [epoch_loss, eval_loss]
             
@@ -247,12 +245,15 @@ class ClassifyNN(nn.Module):
         return self.stats
 
     def test(self, dataloader):
-        for X, y in dataloader:
+        accs = torch.zeros(len(dataloader))
+        
+        for i, (X, y) in enumerate(tqdm(dataloader)):
             preds = self(X)
             preds = torch.argmax(preds, dim=1)
-            acc = torch.eq(y, preds).long().mean().item()
+            curr_acc = torch.eq(y, preds).double().mean().item()
+            accs[i] = curr_acc
         
-        return acc
+        return accs.mean()
                 
     def save_model(self, filename):
         torch.save(self.state_dict(), filename)
