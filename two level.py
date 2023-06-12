@@ -6,19 +6,19 @@ from torch.utils.data import DataLoader, WeightedRandomSampler, Subset
 import torch
 import numpy as np
 
-device = torch.device("cude:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-latent_size = 700
+latent_size = 64
 vae = VAE(latent_size).to(device)
-vae.load_model("your_path")
-indxs = np.load("your_path")
-labels = np.load("your_path")
+vae.load_model("C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/FærdigeModeller/beta5/rgb_model_beta64")
+indxs = np.load("moa_indices.npy")
+labels = np.load("moa_int_label.npy")
 labels -= 1
 
 _, counts = np.unique(labels, return_counts=True)
 label_weights = 1 / counts
 
-dataset = ClassifyCells("your_path", [vae], [None], indxs, labels, device)
+dataset = ClassifyCells("C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/Data/singlecell/singh_cp_pipeline_singlecell_images/merged_files/", [vae], [None], indxs, labels)
 
 k1 = k2 = 5
 skf_outer = StratifiedKFold(n_splits=k1, shuffle=True, random_state=69)
