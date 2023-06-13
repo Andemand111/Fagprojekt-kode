@@ -201,6 +201,7 @@ class ClassifyNN(nn.Module):
 
     def __init__(self, num_features, num_hidden, activation="relu"):
         super(ClassifyNN, self).__init__()
+        self.activation = activation
         
         if self.activation == "relu":
             self.act = nn.ReLU()
@@ -208,17 +209,15 @@ class ClassifyNN(nn.Module):
             self.act = nn.Identity()
         
         self.lin1 = nn.Linear(num_features, num_hidden)
-        self.lin2 = nn.Linear(num_hidden, 512)
-        self.lin3 = nn.Linear(512, 12)
+        self.lin2 = nn.Linear(num_hidden, 12)
 
     def forward(self, x):
         y = self.act(self.lin1(x))
-        y = self.act(self.lin2(y))
-        y = F.softmax(self.lin3(y), 1)
+        y = F.softmax(self.lin2(y), 1)
         return y
     
     def train(self, num_epochs, dataloader, eval_data=None, verbose=2):
-        self.stats = np.zeros(num_epochs, 2)
+        self.stats = np.zeros((num_epochs, 2))
         optimizer = torch.optim.Adam(self.parameters())
         
         for epoch in range(num_epochs):
@@ -241,6 +240,10 @@ class ClassifyNN(nn.Module):
             if eval_data is not None:
                 eval_loss = self.evaluate(eval_data)
                 
+           
+            else:
+                eval_loss = 0
+                
             self.stats[epoch, :] = [epoch_loss, eval_loss]
             
             if verbose:
@@ -257,7 +260,7 @@ class ClassifyNN(nn.Module):
         for X, y in dataloader:
             preds = self(X)
             preds = torch.argmax(preds, dim=1)
-            curr_acc = torch.eq(y, preds).long().mean().item()
+            curr_acc = torch.eq(y, preds).double().mean().item()
             accs = np.append(accs, curr_acc)
         
         final_acc = np.mean(accs)
