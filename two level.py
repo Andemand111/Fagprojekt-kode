@@ -20,7 +20,7 @@ label_weights = 1 / counts
 
 dataset = ClassifyCells("C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/Data/singlecell/singh_cp_pipeline_singlecell_images/merged_files/", [vae], [None], indxs, labels)
 
-k1 = k2 = 5
+k1 = k2 = 2
 skf_outer = StratifiedKFold(n_splits=k1, shuffle=True, random_state=69)
 skf_inner = StratifiedKFold(n_splits=k2, shuffle=True, random_state=69)
 
@@ -43,27 +43,28 @@ def make_new_models(num_hiddens, activations):
         models.append(model)
     return models
 
-num_hiddens = [1, 32, 64 ,128, 256]
+num_hiddens = [1,128, 256, 512, 1024]
 activations = ["identity", "relu", "relu", "relu", "relu"]
 
 models = make_new_models(num_hiddens, activations)
-E_gens = np.zeros(k1)
+results = np.zeros((k1, 2))
 
-for outer_fold, (D_par_index, D_test_index) in enumerate(skf_outer(dataset, labels)):    
+
+for outer_fold, (D_par_index, D_test_index) in enumerate(skf_outer.split(dataset, labels)):    
     D_par = Subset(dataset, D_par_index)
     D_test = Subset(dataset, D_test_index)
     
     D_par_labels = labels[D_par_index]
     D_test_labels = labels[D_test_index]
     
-    for inner_fold, (D_train_index, D_val_index) in enumerate(skf_inner(D_par, D_par_labels)):        
+    for inner_fold, (D_train_index, D_val_index) in enumerate(skf_inner.split(D_par, D_par_labels)):        
         accs = np.zeros((k2, len(models)))
         
         D_train = Subset(D_par, D_train_index)
         D_val = Subset(D_par, D_val_index)
         
         train_labels = D_par_labels[D_train_index]
-        val_labels = D_val[D_val_index]
+        val_labels = D_par_labels[D_val_index]
         
         train_dataloader = get_weighted_dataloader(D_train, train_labels, label_weights, num_samples)
         val_dataloader = get_weighted_dataloader(D_val, val_labels, label_weights, num_samples)
@@ -80,6 +81,7 @@ for outer_fold, (D_par_index, D_test_index) in enumerate(skf_outer(dataset, labe
         
     E_s_acc = np.mean(accs, 0)
     best_model_index = np.argmax(E_s_acc)
+    results[outer_fold, 0] = best_model_index 
     best_parameters = (latent_size, num_hiddens[best_model_index], activations[best_model_index])
     best_model = ClassifyNN(*best_parameters)
     
@@ -88,12 +90,12 @@ for outer_fold, (D_par_index, D_test_index) in enumerate(skf_outer(dataset, labe
     
     print(f"Training and testing best model in outer: {outer_fold}")
     best_model.train(num_epochs, par_dataloader, verbose=0)
-    E_gens[outer_fold] = best_model.test(test_dataloader)
-    best_model.save(f"best_model{outer_fold}")
+    results[outer_fold, 1] = best_model.test(test_dataloader)
+    best_model.save_model(f"best_model{outer_fold}")
     print("Done!")
     
     models = make_new_models(num_hiddens, activations)
     
-E_gen = np.mean(E_gens)
-np.save("E_gens", E_gens)
+E_gen = np.mean(results[:, 1])
+np.save("results", results)
 print(E_gen * 100, "%")
