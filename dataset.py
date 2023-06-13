@@ -24,10 +24,12 @@ class SmallCells(Dataset):
         if self.channel is not None:
             sample = sample[:, :, self.channel]
 
+        sample = torch.from_numpy(sample).flatten().float()
+
+
         if self.device is not None:
             sample = sample.to(self.device)
 
-        sample = torch.from_numpy(sample).flatten().float()
         return sample
 
 
@@ -51,11 +53,12 @@ class Cells(Dataset):
 
         if self.channel is not None:
             sample = sample[:, :, self.channel]
+            
+        sample = torch.from_numpy(sample).flatten().float()
 
         if self.device is not None:
             sample = sample.to(self.device)
 
-        sample = torch.from_numpy(sample).flatten().float()
         return sample
 
 
