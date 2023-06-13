@@ -5,6 +5,9 @@ import torch.nn as nn
 from torch.nn import functional as F
 import matplotlib.pyplot as plt
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+
 class Encoder(torch.nn.Module):
     """  Encoder class for VAE
 
@@ -126,8 +129,8 @@ class VAE(nn.Module):
         elif distribution == "normal":
             var = sigma ** 2
             distance = ((x_hat - x_recon) ** 2).sum(1).mean() / (2 * var)
-            const = 0.5 * 68**2 * self.num_channels * log(2 * torch.pi * var) 
-            Re = distance + const
+            const = 0.5 * 68**2 * self.num_channels * log(torch.tensor([2 * torch.pi * var])) 
+            Re = distance.to(device) + const.to(device)
             
         return Re
     
