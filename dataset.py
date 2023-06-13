@@ -24,12 +24,10 @@ class SmallCells(Dataset):
         if self.channel is not None:
             sample = sample[:, :, self.channel]
 
-        sample = torch.from_numpy(sample).flatten().float()
-
-
         if self.device is not None:
             sample = sample.to(self.device)
 
+        sample = torch.from_numpy(sample).flatten().float()
         return sample
 
 
@@ -53,7 +51,7 @@ class Cells(Dataset):
 
         if self.channel is not None:
             sample = sample[:, :, self.channel]
-            
+
         sample = torch.from_numpy(sample).flatten().float()
 
         if self.device is not None:
@@ -64,12 +62,13 @@ class Cells(Dataset):
 
 class ClassifyCells(Dataset):
 
-    def __init__(self, path, models, color_channels, indxs, labels):
+    def __init__(self, path, models, color_channels, indxs, labels, device=None):
         self.path = path
         self.models = models
         self.color_channels = color_channels
         self.indxs = indxs
         self.labels = labels
+        self.device = device
 
     def __len__(self):
         return len(self.indxs)
@@ -78,7 +77,10 @@ class ClassifyCells(Dataset):
         directory_idx = self.indxs[idx]
         y = self.labels[idx]
         
-        sample = np.load(self.path + str(directory_idx)).astype(np.float32)
+        if type(self.path) == str:   
+            sample = np.load(self.path + str(directory_idx)).astype(np.float32)
+        else:
+            sample = self.path[directory_idx].astype(np.float32).reshape(68,68,3)
 
         # divide by max value in each channel
         sample /= np.amax(sample, axis=(0, 1))
@@ -92,5 +94,8 @@ class ClassifyCells(Dataset):
                 encoding  = model.encode(sample)
             
             X = torch.cat((X, encoding.flatten()))
+
+        if self.device is not None:
+            X = X.to(self.device)        
 
         return X, y
