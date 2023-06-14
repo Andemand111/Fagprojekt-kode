@@ -9,21 +9,13 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class Encoder(torch.nn.Module):
-    """  Encoder class for VAE
+    """
+    Encoder class for a variational autoencoder.
 
-    Arguments:
-    latent_size : integer, the amount of latent variables in bottleneck
-
-    Functions:
-        forward:
-            arguments:
-                x :             a data matrix (n x 13872)
-
-            returns: 
-                mu, log_var:    the location and log scale of the distribution
-                                of the latent variables
-
-        """
+    Args:
+        latent_size (int): The size of the latent space.
+        num_channels (int): The number of input channels (default: 3).
+    """
 
     def __init__(self, latent_size, num_channels = 3):
         super(Encoder, self).__init__()
@@ -40,6 +32,17 @@ class Encoder(torch.nn.Module):
         self.log_var_lin = nn.Linear(2048, latent_size)
 
     def forward(self, x):
+        """
+        Forward pass of the encoder.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            mu (torch.Tensor): Mean of the latent space.
+            log_var (torch.Tensor): Log variance of the latent space.
+        """
+        
         x_reshaped = x.view(-1, 68, 68, self.num_channels).permute(0, 3, 1, 2)
         
         z = F.relu(self.conv1(x_reshaped))
@@ -55,21 +58,12 @@ class Encoder(torch.nn.Module):
 
 
 class Decoder(nn.Module):
-    """  Decoder class for VAE
+    """
+    Decoder class for a variational autoencoder.
 
-    Arguments:
-    latent_size : integer, the amount of latent variables in bottleneck
-
-    Functions:
-        forward:
-            arguments:
-                z :             a matrix of latent variables (n x latent_size)
-
-            returns: 
-                x_hat:          a data matrix (n x 13872); the reconstruced image 
-                                given z (or rather a distribution parameter for each 
-                                pixel value)
-
+    Args:
+        latent_size (int): The size of the latent space.
+        num_channels (int): The number of output channels (default: 3).
     """
 
     def __init__(self, latent_size, num_channels = 3):
@@ -80,6 +74,16 @@ class Decoder(nn.Module):
         self.lin3 = nn.Linear(4096, 68 * 68 * num_channels)
 
     def forward(self, z):
+        """
+        Forward pass of the decoder.
+
+        Args:
+            z (torch.Tensor): Latent space tensor.
+
+        Returns:
+            x_hat (torch.Tensor): Reconstructed output tensor.
+        """
+        
         x_hat = F.relu(self.lin1(z))
         x_hat = F.relu(self.lin2(x_hat))
         x_hat = torch.sigmoid(self.lin3(x_hat))
@@ -87,6 +91,14 @@ class Decoder(nn.Module):
 
 
 class VAE(nn.Module):
+    """
+    Variational Autoencoder (VAE) class.
+
+    Args:
+        latent_size (int): The size of the latent space.
+        num_channels (int): The number of input/output channels (default: 3).
+    """
+    
     def __init__(self, latent_size, num_channels = 3):
         super(VAE, self).__init__()
 
@@ -98,12 +110,35 @@ class VAE(nn.Module):
         self.decoder = Decoder(latent_size, num_channels = num_channels)
 
     def reparameterization(self, mu, log_var):
+        """
+        Reparameterization trick for sampling from a normal distribution.
+
+        Args:
+            mu (torch.Tensor): Mean of the latent space.
+            log_var (torch.Tensor): Log variance of the latent space.
+
+        Returns:
+            z (torch.Tensor): Sampled latent space tensor.
+        """
+        
         std = torch.exp(0.5 * log_var)
         eps = torch.randn_like(std)
         
         return eps.mul(std).add_(mu)
 
     def forward(self, x):
+        """
+        Forward pass of the VAE.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            mu (torch.Tensor): Mean of the latent space.
+            log_var (torch.Tensor): Log variance of the latent space.
+            x_hat (torch.Tensor): Reconstructed output tensor.
+        """
+
         mu, log_var = self.encoder(x)
         sampled_z = self.reparameterization(mu, log_var)
         x_hat = self.decoder(sampled_z)
@@ -111,6 +146,21 @@ class VAE(nn.Module):
         return mu, log_var, x_hat
 
     def reconstruction_loss(self, x_hat, x_recon, distribution="beta", kappa=3.47, sigma=0.229):
+        """
+        Compute the reconstruction loss between the reconstructed output and the original input.
+
+        Args:
+            x_hat (torch.Tensor): Reconstructed output tensor.
+            x_recon (torch.Tensor): Original input tensor.
+            distribution (str): Distribution type ("beta" or "normal").
+            kappa (float): Parameter for the beta distribution (default: 3.47).
+            sigma (float): Standard deviation for the normal distribution (default: 0.229).
+
+        Returns:
+            Re (torch.Tensor): Reconstruction loss.
+            
+        """
+        
         if distribution == "beta":
             eps = 1e-6
             x_recon = torch.clamp(x_recon, eps, 1-eps)
@@ -135,10 +185,37 @@ class VAE(nn.Module):
         return Re
     
     def kl_divergence(self, log_var, mu):
+        """
+        Compute the Kullback-Leibler divergence between the learned distribution and a standard normal distribution.
+
+        Args:
+            log_var (torch.Tensor): Log variance of the latent space.
+            mu (torch.Tensor): Mean of the latent space.
+
+        Returns:
+            kl (torch.Tensor): KL divergence.
+        """
+        
         kl = 0.5 * (log_var.exp() + mu ** 2 - 1 - log_var).sum(1).mean()
         return kl
     
     def ELBO(self, x_recon, distribution = "beta", kappa = 3.47, sigma = 0.229, kl_beta = 1):
+        """
+        Compute the Evidence Lower Bound (ELBO) loss.
+
+        Args:
+            x_recon (torch.Tensor): Original input tensor.
+            distribution (str): Distribution type ("beta" or "normal").
+            kappa (float): Parameter for the beta distribution (default: 3.47).
+            sigma (float): Standard deviation for the normal distribution (default: 0.229).
+            kl_beta (float): Weight for the KL divergence term (default: 1).
+
+        Returns:
+            loss (torch.Tensor): ELBO loss.
+            re (torch.Tensor): Reconstruction loss.
+            kl (torch.Tensor): KL divergence.
+        """
+        
         mu, log_var, x_hat = self(x_recon)
         re = self.reconstruction_loss(x_hat, x_recon, distribution, kappa, sigma)
         kl = self.kl_divergence(log_var, mu)
@@ -146,6 +223,24 @@ class VAE(nn.Module):
         return  loss, re, kl
 
     def train(self, num_epochs, dataloader, kl_beta=1, verbose=2, distribution="beta", kappa=3.47, sigma=0.229, callback=None, callback_args=dict()):
+        """
+        Training loop for the VAE.
+
+        Args:
+            num_epochs (int): Number of training epochs.
+            dataloader (torch.utils.data.DataLoader): DataLoader for the training data.
+            kl_beta (float): Weight for the KL divergence term (default: 1).
+            verbose (int): Verbosity level (0: silent, 1: print epoch statistics, 2: print epoch and batch statistics).
+            distribution (str): Distribution type ("beta" or "normal").
+            kappa (float): Parameter for the beta distribution (default: 3.47).
+            sigma (float): Standard deviation for the normal distribution (default: 0.229).
+            callback (function): Callback function to be called at the end of each epoch (default: None).
+            callback_args (dict): Arguments to be passed to the callback function (default: {}).
+
+        Returns:
+            stats (np.ndarray): Array of training statistics (loss, reconstruction loss, KL divergence) for each epoch.
+        """
+        
         self.stats = np.zeros((num_epochs, 3))
         optimizer = torch.optim.Adam(self.parameters())
 
@@ -201,6 +296,18 @@ class VAE(nn.Module):
         return x_hat.detach()
 
 class ClassifyNN(nn.Module):
+    
+    """
+    Neural network model for classification tasks.
+
+    This class defines a neural network model with customizable activation function and hidden layers.
+    It provides methods for training, testing, saving and loading the model.
+
+    Args:
+        num_features (int): Number of input features.
+        num_hidden (int): Number of units in the hidden layer.
+        activation (str): Activation function to use (default: "relu").
+    """
 
     def __init__(self, num_features, num_hidden, activation="relu"):
         super(ClassifyNN, self).__init__()
@@ -215,11 +322,34 @@ class ClassifyNN(nn.Module):
         self.lin2 = nn.Linear(num_hidden, 12)
 
     def forward(self, x):
+        """
+        Defines the forward pass of the model.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
+        
         y = self.act(self.lin1(x))
         y = F.softmax(self.lin2(y), 1)
         return y
     
     def train(self, num_epochs, dataloader, eval_data=None, verbose=2):
+        """
+        Trains the model.
+
+        Args:
+            num_epochs (int): Number of training epochs.
+            dataloader (torch.utils.data.DataLoader): Training data loader.
+            eval_data (torch.utils.data.DataLoader): Evaluation data loader (default: None).
+            verbose (int): Verbosity level (0: silent, 1: print epoch summary, 2: print batch details) (default: 2).
+
+        Returns:
+            numpy.ndarray: Training statistics.
+        """
+        
         self.stats = np.zeros((num_epochs, 2))
         optimizer = torch.optim.Adam(self.parameters())
         
@@ -258,6 +388,16 @@ class ClassifyNN(nn.Module):
         return self.stats
 
     def test(self, dataloader):
+        """
+       Evaluates the model on test data.
+
+       Args:
+           dataloader (torch.utils.data.DataLoader): Test data loader.
+
+       Returns:
+           float: Accuracy of the model on the test data.
+       """
+        
         accs = np.zeros(len(dataloader))
         
         for X, y in dataloader:
@@ -271,10 +411,25 @@ class ClassifyNN(nn.Module):
         return final_acc
                 
     def save_model(self, filename):
+        """
+        Saves the model's state dictionary to a file.
+
+        Args:
+            filename (str): Name of the file to save the model.
+        """
+        
         torch.save(self.state_dict(), filename)
         print("Model saved!")
         
     def load_model(self, filename, device="cpu"):
+        """
+        Loads a trained model from a file.
+
+        Args:
+            filename (str): Name of the file to load the model from.
+            device (str): Device to load the model onto (default: "cpu").
+        """
+        
         map_location = device  
         self.load_state_dict(torch.load(filename, map_location=map_location))
         print("Model loaded!")
