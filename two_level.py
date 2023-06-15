@@ -1,32 +1,49 @@
-from models import VAE, ClassifyNN
-from dataset import ClassifyCells
+from models import ClassifyNN
 from sklearn.model_selection import StratifiedKFold
-from torch.utils.data import DataLoader, WeightedRandomSampler, Subset
-
+from torch.utils.data import DataLoader, WeightedRandomSampler, Subset, Dataset
 import torch
 import numpy as np
+from tqdm import tqdm
 
+num_samples = None             ## how much data is used. None = all data
+num_epochs = 1
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+latent_sizergb = 64
+latent_sizesingle = 32
+latent_size = latent_sizergb + latent_sizesingle * 3   ## total size of model input using all 4 models
 
-latent_size = 64
-vae = VAE(latent_size).to(device)
-vae.load_model("C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/FærdigeModeller/beta5/rgb_model_beta64")
-indxs = np.load("moa_indices.npy")
+### loads data and the labels pertaining thereto
+data = torch.load("data_matrix_encodings.pt")
 labels = np.load("moa_int_label.npy")
 labels -= 1
 
+### defines the dataset class and makes an instance of it
+class Data(Dataset):
+    def __init__(self, data, labels, device):
+        self.data = data
+        self.labels = labels
+        self.device = device
+    
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, idx):
+        X = self.data[idx].to(self.device)
+        y = torch.from_numpy(self.labels[idx]).to(self.device)
+        return X, y
+
+dataset = Data(data, labels, device)
+
+## calculates label_weights which are later used for making a weighted sampler
 _, counts = np.unique(labels, return_counts=True)
 label_weights = 1 / counts
 
-dataset = ClassifyCells("C:/Users/gusta/OneDrive/Skrivebord/KI & Data/Semester 4/Fagprojekt/Data/singlecell/singh_cp_pipeline_singlecell_images/merged_files/", [vae], [None], indxs, labels)
-
-k1 = k2 = 2
+## makes folds
+k1 = k2 = 5
 skf_outer = StratifiedKFold(n_splits=k1, shuffle=True, random_state=69)
 skf_inner = StratifiedKFold(n_splits=k2, shuffle=True, random_state=69)
 
-num_samples = 300
-num_epochs = 1
-
+## functions used for getting weighted dataloader and new models
 def get_weighted_dataloader(dataset, labels, label_weights, num_samples = None):
     if num_samples == None:
         num_samples = len(labels)
@@ -36,21 +53,22 @@ def get_weighted_dataloader(dataset, labels, label_weights, num_samples = None):
     dataloader = DataLoader(dataset, batch_size=128, sampler=train_sampler, drop_last=True)
     return dataloader
     
-def make_new_models(num_hiddens, activations):
+def make_new_models(num_hiddens, activations, device):
     models = []
     for num_hidden, act_func in zip(num_hiddens, activations):
-        model = ClassifyNN(latent_size, num_hidden, act_func)
+        model = ClassifyNN(latent_size, num_hidden, act_func).to(device)
         models.append(model)
     return models
 
-num_hiddens = [1,128, 256, 512, 1024]
+## make new models
+num_hiddens = [160, 128, 256, 512, 1024]
 activations = ["identity", "relu", "relu", "relu", "relu"]
+models = make_new_models(num_hiddens, activations, device)
 
-models = make_new_models(num_hiddens, activations)
 results = np.zeros((k1, 2))
 
-
-for outer_fold, (D_par_index, D_test_index) in enumerate(skf_outer.split(dataset, labels)):    
+## k-fold cross validation loop
+for outer_fold, (D_par_index, D_test_index) in tqdm(enumerate(skf_outer.split(dataset, labels))):    
     D_par = Subset(dataset, D_par_index)
     D_test = Subset(dataset, D_test_index)
     
@@ -83,7 +101,7 @@ for outer_fold, (D_par_index, D_test_index) in enumerate(skf_outer.split(dataset
     best_model_index = np.argmax(E_s_acc)
     results[outer_fold, 0] = best_model_index 
     best_parameters = (latent_size, num_hiddens[best_model_index], activations[best_model_index])
-    best_model = ClassifyNN(*best_parameters)
+    best_model = ClassifyNN(*best_parameters).to(device)
     
     par_dataloader = get_weighted_dataloader(D_par, D_par_labels, label_weights, num_samples)
     test_dataloader = get_weighted_dataloader(D_test, D_test_labels, label_weights, num_samples)

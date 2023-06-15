@@ -84,16 +84,18 @@ class ClassifyCells(Dataset):
 
         # divide by max value in each channel
         sample /= np.amax(sample, axis=(0, 1))
-        sample = torch.from_numpy(sample).flatten().float()
         
         X = torch.tensor([])        
         for model, channel in zip(self.models, self.color_channels):
             if channel is not None:
-                encoding = model.encode(sample[:, :, channel])
+                temp_sample = torch.from_numpy(sample[:, :, channel]).flatten().float()
             else:
-                encoding  = model.encode(sample)
+                temp_sample = torch.from_numpy(sample).flatten().float()
             
+            
+            encoding  = model.encode(temp_sample)
             X = torch.cat((X, encoding.flatten()))
+            
 
         if self.device is not None:
             X = X.to(self.device)        
