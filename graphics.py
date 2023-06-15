@@ -188,6 +188,7 @@ class Graphics:
             plt.suptitle(title)  # Adding a title to the visualization
 
         plt.show()  # Displaying the plot
+        return z
         
     def find_interesting_features(self):
         """
