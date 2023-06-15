@@ -7,17 +7,17 @@ import numpy as np
 import torch
 #%%
 
-data = np.load("celle_data.npy")
+data = np.load("G:/Mit drev/Uni/4. semester/fagprojekt/fra_git/celle_data.npy")
 dataset = SmallCells(data)
 
 #%%
 path = "G:/Mit drev/Project Splinter Cell/modeller/rgbmodeller/"
-name = "rgb_model_normal64"
+name = "rgb_model_beta64"
 latent_size = 64
 num_channels = 3
 channel = None
 cmap = "viridis"
-title= "Normal-VAE"
+title= "Beta-VAE"
 
 model = VAE(latent_size, num_channels=num_channels)
 model.load_model(path + name)
