@@ -68,9 +68,13 @@ class Graphics:
         fig, axs = plt.subplots(len(indxs), 2)  # Creating subplots for reconstructed images
         for i, ax in enumerate(axs):
             cell = self.data[indxs[i]]  # Selecting an input image
-            z = self.model.encode(cell)  # Encoding the input image to obtain latent vectors
+            if self.num_channels == 1:
+                cell = cell.reshape(68, 68, 3)[:, :, self.channel]
+            else:
+                cell = cell.reshape(68, 68, 3)
+            z = self.model.encode(cell.flatten())  # Encoding the input image to obtain latent vectors
             x_hat = self.model.decode(z)  # Decoding the latent vectors to reconstruct the image
-            ax[0].imshow(cell.reshape(68, 68, self.num_channels), cmap=self.cmap)  # Plotting the original image
+            ax[0].imshow(cell, cmap=self.cmap)  # Plotting the original image
             ax[1].imshow(x_hat.reshape(68, 68, self.num_channels), cmap=self.cmap)  # Plotting the reconstructed image
 
         fig.set_size_inches(4, len(indxs) * 2)  # Setting the figure size
@@ -118,7 +122,9 @@ class Graphics:
        """
         fig, axs = plt.subplots(5, 5)  # Creating subplots for feature investigation
         cell = self.data[data_idx]  # Selecting an input image as a reference
-        mu = self.model.encode(cell)  # Encoding the reference image to obtain latent vectors
+        if self.num_channels == 1:
+            cell = cell.reshape(68, 68, 3)[:, :, self.channel]
+        mu = self.model.encode(cell.flatten())  # Encoding the reference image to obtain latent vectors
         space = np.linspace(-2, 2, 25)  # Creating a range of values to investigate the feature
         for i, ax in zip(space, axs.flatten()):
             mu[0, feature_idx] = i  # Setting the feature value to investigate
@@ -146,8 +152,13 @@ class Graphics:
         """
         cell1 = self.data[idxs[0]]  # Selecting the first input image
         cell2 = self.data[idxs[1]]  # Selecting the second input image
-        encoding1 = self.model.encode(cell1)  # Encoding the first input image to obtain latent vectors
-        encoding2 = self.model.encode(cell2)  # Encoding the second input image to obtain latent vectors
+        
+        if self.num_channels == 1:
+            cell1 = cell1.reshape(68, 68, 3)[:, :, self.channel]
+            cell2 = cell2.reshape(68, 68, 3)[:, :, self.channel]
+        
+        encoding1 = self.model.encode(cell1.flatten())  # Encoding the first input image to obtain latent vectors
+        encoding2 = self.model.encode(cell2.flatten())  # Encoding the second input image to obtain latent vectors
 
         retning = encoding2 - encoding1  # Calculating the direction between the two encodings
 
@@ -177,8 +188,11 @@ class Graphics:
             title (str): The title of the visualization (optional).
             filename (str): The filename to save the plot (optional).
         """
-        x_hat = self.data[idx]  # Selecting an input image
-        z = self.model.encode(x_hat)  # Encoding the input image to obtain latent vectors
+        cell = self.data[idx]  # Selecting an input image
+        if self.num_channels == 1:
+            cell = cell.reshape(68, 68, 3)[:, :, self.channel]
+        
+        z = self.model.encode(cell.flatten())  # Encoding the input image to obtain latent vectors
         plt.bar(np.arange(self.latent_size), z.flatten())  # Plotting the bar chart of the latent vectors
 
         if filename:
