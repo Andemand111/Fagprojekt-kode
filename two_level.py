@@ -3,17 +3,17 @@ from sklearn.model_selection import StratifiedKFold
 from torch.utils.data import DataLoader, WeightedRandomSampler, Subset, Dataset
 import torch
 import numpy as np
-from tqdm import tqdm
+#from tqdm import tqdm
 
 num_samples = None             ## how much data is used. None = all data
-num_epochs = 1
+num_epochs = 50
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 latent_sizergb = 64
 latent_sizesingle = 32
 latent_size = latent_sizergb + latent_sizesingle * 3   ## total size of model input using all 4 models
 
 ### loads data and the labels pertaining thereto
-data = torch.load("data_matrix_encodings.pt")
+data = torch.load("data_matrix_encodings_beta")
 labels = np.load("moa_int_label.npy")
 labels -= 1
 
@@ -29,7 +29,7 @@ class Data(Dataset):
 
     def __getitem__(self, idx):
         X = self.data[idx].to(self.device)
-        y = torch.from_numpy(self.labels[idx]).to(self.device)
+        y = torch.tensor(self.labels[idx]).to(self.device)
         return X, y
 
 dataset = Data(data, labels, device)
@@ -61,22 +61,25 @@ def make_new_models(num_hiddens, activations, device):
     return models
 
 ## make new models
-num_hiddens = [160, 128, 256, 512, 1024]
-activations = ["identity", "relu", "relu", "relu", "relu"]
+num_hiddens = [256, 128, 256, 512, 1024]
+activations = ["relu", "relu", "relu", "relu", "relu"]
 models = make_new_models(num_hiddens, activations, device)
 
 results = np.zeros((k1, 2))
 
+
 ## k-fold cross validation loop
-for outer_fold, (D_par_index, D_test_index) in tqdm(enumerate(skf_outer.split(dataset, labels))):    
+for outer_fold, (D_par_index, D_test_index) in enumerate(skf_outer.split(dataset, labels)):    
     D_par = Subset(dataset, D_par_index)
     D_test = Subset(dataset, D_test_index)
     
     D_par_labels = labels[D_par_index]
     D_test_labels = labels[D_test_index]
+    accs = np.zeros((k2, len(models)))
+
+    
     
     for inner_fold, (D_train_index, D_val_index) in enumerate(skf_inner.split(D_par, D_par_labels)):        
-        accs = np.zeros((k2, len(models)))
         
         D_train = Subset(D_par, D_train_index)
         D_val = Subset(D_par, D_val_index)
@@ -94,8 +97,11 @@ for outer_fold, (D_par_index, D_test_index) in tqdm(enumerate(skf_outer.split(da
             model.train(num_epochs, train_dataloader, verbose=0)
             acc = model.test(val_dataloader)
             accs[inner_fold, s] = acc
+            print(acc * 100, "%")
             
             print("..done!")
+
+
         
     E_s_acc = np.mean(accs, 0)
     best_model_index = np.argmax(E_s_acc)
@@ -109,11 +115,12 @@ for outer_fold, (D_par_index, D_test_index) in tqdm(enumerate(skf_outer.split(da
     print(f"Training and testing best model in outer: {outer_fold}")
     best_model.train(num_epochs, par_dataloader, verbose=0)
     results[outer_fold, 1] = best_model.test(test_dataloader)
-    best_model.save_model(f"best_model{outer_fold}")
+    best_model.save_model(f"best_model{outer_fold}_beta")
     print("Done!")
     
-    models = make_new_models(num_hiddens, activations)
+    models = make_new_models(num_hiddens, activations, device)
     
 E_gen = np.mean(results[:, 1])
-np.save("results", results)
+np.save("results_beta", results)
 print(E_gen * 100, "%")
+

@@ -356,10 +356,12 @@ class ClassifyNN(nn.Module):
         for epoch in range(num_epochs):
             curr_loss = np.zeros(len(dataloader))
             
-            for i, (X, y) in enumerate(dataloader):                
+            for i, (X, y) in enumerate(dataloader):  
+                optimizer.zero_grad()
+                
                 preds = self(X)
-                y = F.one_hot(y.long(), 12).float()
-                loss = F.binary_cross_entropy(preds, y)
+                criterion = nn.CrossEntropyLoss()
+                loss = criterion(preds, y.long())
                 curr_loss[i] = loss.item()
 
                 loss.backward()
@@ -369,6 +371,7 @@ class ClassifyNN(nn.Module):
                     print(f"Batch {i + 1} out of {len(dataloader)}")
             
             epoch_loss = np.mean(curr_loss)
+            print(epoch_loss)
             
             if eval_data is not None:
                 eval_loss = self.evaluate(eval_data)
