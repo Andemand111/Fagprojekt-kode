@@ -319,7 +319,9 @@ class ClassifyNN(nn.Module):
             self.act = nn.Identity()
         
         self.lin1 = nn.Linear(num_features, num_hidden)
-        self.lin2 = nn.Linear(num_hidden, 12)
+        self.lin2 = nn.Linear(num_hidden, num_hidden)
+        self.lin3 = nn.Linear(num_hidden, num_hidden)
+        self.lin4 = nn.Linear(num_hidden, 12)
 
     def forward(self, x):
         """
@@ -333,7 +335,9 @@ class ClassifyNN(nn.Module):
         """
         
         y = self.act(self.lin1(x))
-        y = F.softmax(self.lin2(y), 1)
+        y = self.act(self.lin2(y))
+        y = self.act(self.lin3(y))
+        y = F.softmax(self.lin4(y), 1)
         return y
     
     def train(self, num_epochs, dataloader, eval_data=None, verbose=2):
@@ -352,15 +356,15 @@ class ClassifyNN(nn.Module):
         
         self.stats = np.zeros((num_epochs, 2))
         optimizer = torch.optim.Adam(self.parameters())
+        criterion = nn.CrossEntropyLoss()
         
         for epoch in range(num_epochs):
             curr_loss = np.zeros(len(dataloader))
             
-            for i, (X, y) in enumerate(dataloader):  
+            for i, (X, y) in enumerate(dataloader):      
                 optimizer.zero_grad()
                 
                 preds = self(X)
-                criterion = nn.CrossEntropyLoss()
                 loss = criterion(preds, y.long())
                 curr_loss[i] = loss.item()
 
@@ -371,12 +375,9 @@ class ClassifyNN(nn.Module):
                     print(f"Batch {i + 1} out of {len(dataloader)}")
             
             epoch_loss = np.mean(curr_loss)
-            print(epoch_loss)
             
             if eval_data is not None:
                 eval_loss = self.evaluate(eval_data)
-                
-           
             else:
                 eval_loss = 0
                 
@@ -385,8 +386,8 @@ class ClassifyNN(nn.Module):
             if verbose:
                 print(f"Epoch: {epoch + 1} / {num_epochs}")
                 print(f"loss: {epoch_loss} \n")
-                plt.plot(self.stats)
-                plt.show()
+                # plt.plot(self.stats)
+                # plt.show()
         
         return self.stats
 
