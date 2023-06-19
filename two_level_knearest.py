@@ -17,8 +17,8 @@ labels = np.load("moa_int_label.npy")
 labels = labels - 1
 data = data[indxs]
 
-sampler = RandomOverSampler(sampling_strategy = "auto")
-# sampler = RandomUnderSampler(sampling_strategy = "auto")
+# sampler = RandomOverSampler(sampling_strategy = "auto")
+sampler = RandomUnderSampler(sampling_strategy = "auto")
 X, y = sampler.fit_resample(data, labels)
 
 n_neighbors = [1, 5, 10, 20, 40]
