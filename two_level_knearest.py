@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 from sklearn.model_selection import StratifiedKFold
 from sklearn.neighbors import KNeighborsClassifier
 import torch
@@ -6,8 +5,8 @@ import numpy as np
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 
-distribution = "normal"
-num_features = 160   ## total size of model input using all 4 models
+distribution = "beta"
+random_state = 42
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 ### loads data and the labels pertaining thereto
@@ -18,16 +17,16 @@ labels = np.load("moa_int_label.npy")
 labels = labels - 1
 data = data[indxs]
 
-# sampler = RandomOverSampler(sampling_strategy = "auto")
-sampler = RandomUnderSampler(sampling_strategy = "auto")
+sampler = RandomOverSampler(sampling_strategy = "auto")
+# sampler = RandomUnderSampler(sampling_strategy = "auto")
 X, y = sampler.fit_resample(data, labels)
 
 n_neighbors = [1, 5, 10, 20, 40]
 
 ## makes folds
 k1 = k2 = 5
-skf_outer = StratifiedKFold(n_splits=k1, shuffle=True, random_state=69)
-skf_inner = StratifiedKFold(n_splits=k2, shuffle=True, random_state=69)
+skf_outer = StratifiedKFold(n_splits=k1, shuffle=True, random_state=random_state)
+skf_inner = StratifiedKFold(n_splits=k2, shuffle=True, random_state=random_state)
 
 results = np.zeros((k1, 2))
 
