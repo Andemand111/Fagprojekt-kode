@@ -2,10 +2,28 @@ import numpy as np
 from torch.utils.data import Dataset
 import torch
 
+"""
+
+Various Dataset classes for different uses
+In short:
+    SmallCells is for a subset of cells contained in a matrix
+    Cells is for all files in a folder.
+    Encodings is for the latent encodings for downstream classification task
+    
+"""
+
 
 class SmallCells(Dataset):
-    """ Takes a small dataset as input """
-
+    """
+    
+    Class for small dataset
+    Input:
+        data : a datamatrix containing cell images
+        channel : which colorchannel to return
+        device : a torch device
+    
+    """
+    
     def __init__(self, data, channel=None, device=None):
         self.data = data
         self.channel = channel
@@ -32,7 +50,15 @@ class SmallCells(Dataset):
 
 
 class Cells(Dataset):
-    """" Can be used to run on hpc """
+    """" 
+    
+    Class for big dataset
+    Input:
+        path : string, where are the files located
+        channel : which colorchannel to return
+        device : a torch device
+    
+    """
 
     def __init__(self, path, channel=None, device=None):
         self.path = path
@@ -61,6 +87,17 @@ class Cells(Dataset):
 
 ### defines the dataset class and makes an instance of it
 class Encodings(Dataset):
+    """" 
+    
+    Class for encodings
+    Input:
+        encodings : datamatrix containing the encodings
+        labels : array of labels
+        indxs : array of indxs, if not all encodings have labels
+        device : a torch device
+    
+    """
+    
     def __init__(self, encodings, labels, indxs, device):
         self.labels = labels
         self.indxs = indxs

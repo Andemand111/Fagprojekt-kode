@@ -9,6 +9,7 @@ distribution = "beta"
 random_state = 42
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 ### loads data and the labels pertaining thereto
 data_path = "G:/Mit drev/Uni/4. semester/fagprojekt/fra_git/"
 data = torch.load(data_path + f"{distribution}_encodings")
@@ -56,6 +57,7 @@ for outer_fold, (D_par_index, D_test_index) in enumerate(skf_outer.split(X, y)):
             print(f"acc = {acc}")
             print("..done!")
             
+    ## find and evaluate best model and save results
     E_s_acc = np.mean(accs, 0)
     best_model_index = np.argmax(E_s_acc)
     results[outer_fold, 0] = best_model_index 
