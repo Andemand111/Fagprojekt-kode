@@ -319,9 +319,7 @@ class ClassifyNN(nn.Module):
             self.act = nn.Identity()
         
         self.lin1 = nn.Linear(num_features, num_hidden)
-        self.lin2 = nn.Linear(num_hidden, num_hidden)
-        self.lin3 = nn.Linear(num_hidden, num_hidden)
-        self.lin4 = nn.Linear(num_hidden, 12)
+        self.lin2 = nn.Linear(num_hidden, 12)
 
     def forward(self, x):
         """
@@ -335,9 +333,7 @@ class ClassifyNN(nn.Module):
         """
         
         y = self.act(self.lin1(x))
-        y = self.act(self.lin2(y))
-        y = self.act(self.lin3(y))
-        y = F.softmax(self.lin4(y), 1)
+        y = F.softmax(self.lin2(y), 1)
         return y
     
     def train(self, num_epochs, dataloader, eval_data=None, verbose=2):
