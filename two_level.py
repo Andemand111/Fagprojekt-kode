@@ -8,7 +8,7 @@ import numpy as np
 
 
 
-distribution = "beta"
+distribution = "normal"
 
 
 num_samples = None             ## how much data is used. None = all data
@@ -17,7 +17,7 @@ num_features = 160   ## total size of model input using all 4 models
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 ### loads data and the labels pertaining thereto
-data_path = "C:/Users/Andba/Google Drev/Uni/4. semester/fagprojekt/fra_git/"
+data_path = "G:/Mit drev/Uni/4. semester/fagprojekt/fra_git/"
 data = torch.load(data_path + f"{distribution}_encodings")
 indxs = np.load(data_path + "moa_indices.npy")
 labels = np.load("moa_int_label.npy")
@@ -66,8 +66,9 @@ for outer_fold, (D_par_index, D_test_index) in enumerate(skf_outer.split(dataset
     D_par_labels = labels[D_par_index]
     D_test_labels = labels[D_test_index]
     
+    accs = np.zeros((k2, len(models)))
+    
     for inner_fold, (D_train_index, D_val_index) in enumerate(skf_inner.split(D_par, D_par_labels)):        
-        accs = np.zeros((k2, len(models)))
         
         D_train = Subset(D_par, D_train_index)
         D_val = Subset(D_par, D_val_index)
@@ -88,7 +89,9 @@ for outer_fold, (D_par_index, D_test_index) in enumerate(skf_outer.split(dataset
             
             print(f"acc = {acc}")
             print("..done!")
-    
+            
+        models = make_new_models(num_hiddens, activations, device)
+
     E_s_acc = np.mean(accs, 0)
     best_model_index = np.argmax(E_s_acc)
     results[outer_fold, 0] = best_model_index 
@@ -105,8 +108,6 @@ for outer_fold, (D_par_index, D_test_index) in enumerate(skf_outer.split(dataset
     np.save(f"best_model_{outer_fold}_{distribution}_stats", stats)
     print("Done!")
     
-    models = make_new_models(num_hiddens, activations)
-
 E_gen = np.mean(results[:, 1])
 np.save(f"two_level_test_{distribution}", results)
 print(E_gen * 100, "%")
