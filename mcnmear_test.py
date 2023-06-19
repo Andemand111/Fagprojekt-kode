@@ -5,6 +5,9 @@ from imblearn.under_sampling import RandomUnderSampler
 from imblearn.over_sampling import RandomOverSampler
 from mlxtend.evaluate import mcnemar_table, mcnemar
 
+# %%
+# Load data
+
 random_state = 42
 np.random.random_state = random_state
 data_path = "G:/Mit drev/Uni/4. semester/fagprojekt/fra_git/"
@@ -13,6 +16,9 @@ labels = np.load("moa_int_label.npy")
 labels = labels - 1
 data_beta = torch.load(data_path + "beta_encodings")[indxs]
 data_normal = torch.load(data_path + "normal_encodings")[indxs]
+
+# %%
+# Split data
 
 sampler = RandomUnderSampler(sampling_strategy = "auto", random_state = random_state)
 X_beta, y = sampler.fit_resample(data_beta, labels)
@@ -32,6 +38,9 @@ X_beta_test = X_beta[test_indxs]
 X_normal_test = X_normal[test_indxs]
 y_test = y[test_indxs]
 
+# %%
+# Train and test models
+
 beta_model = KNeighborsClassifier(n_neighbors=20)
 normal_model = KNeighborsClassifier(n_neighbors=20)
 
@@ -41,6 +50,9 @@ normal_model.fit(X_normal_train, y_train)
 beta_preds = beta_model.predict(X_beta_test)
 normal_preds = normal_model.predict(X_normal_test)
 
+
+#%%
+# McNemar test
 table = mcnemar_table(y_target=y_test, 
                       y_model1=beta_preds, 
                       y_model2=normal_preds)

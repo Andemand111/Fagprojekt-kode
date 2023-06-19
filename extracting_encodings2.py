@@ -5,6 +5,8 @@ import torch
 
 from models import VAE
 
+# Load data and models
+
 path = "G:/Mit drev/Project Splinter Cell/"
 metadata = pd.read_csv(path + "metadata.csv")
 old_path = "C:/Users/Andba/Desktop/singlecell/singh_cp_pipeline_singlecell_images/"
@@ -13,6 +15,7 @@ new_path = "C:/Users/Andba/Desktop/encodings/"
 rgb_model_paths = "G:/Mit drev/Project Splinter Cell/modeller/rgbmodeller/"
 single_model_paths = "G:/Mit drev/Project Splinter Cell/modeller/singlechannelmodeller/"
 
+# Create encodings
 for typ in ["beta", "normal"]:
     encodings = torch.zeros(len(metadata), 160)
     
@@ -25,7 +28,7 @@ for typ in ["beta", "normal"]:
     r_model.load_model(single_model_paths + f"r_model_{typ}32")
     g_model.load_model(single_model_paths + f"g_model_{typ}32")
     b_model.load_model(single_model_paths + f"b_model_{typ}32")
-    
+
     for i in tqdm(range(len(metadata))):
         folder_name = metadata["Multi_Cell_Image_Name"][i] + "/"
         file_name = metadata["Single_Cell_Image_Name"][i]

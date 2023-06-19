@@ -6,11 +6,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 #%%
-
+# Load data
 data = np.load("G:/Mit drev/Uni/4. semester/fagprojekt/fra_git/celle_data.npy")
 dataset = SmallCells(data)
 
 #%%
+
+# Load model
 path = "G:/Mit drev/Project Splinter Cell/modeller/rgbmodeller/"
 name = "rgb_model_normal64"
 latent_size = 64
@@ -35,6 +37,8 @@ interesting_feature = np.argmax(abs(z))
 plots.investigate_feature(interesting_feature)
 
 #%%
+
+
 n_rows = 10
 # sim_scores = plots.find_interesting_features()
 # feature_i, feature_j = np.argsort(sim_scores)[:2]

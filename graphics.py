@@ -1,8 +1,8 @@
-import matplotlib.pyplot as plt  # Importing the library for plotting visualizations
-import numpy as np  # Importing the library for numerical operations
-import torch  # Importing the library for tensor computations
-from tqdm import tqdm  # Importing the library for creating progress bars
-from sklearn.metrics.pairwise import cosine_similarity  # Importing the cosine_similarity function
+import matplotlib.pyplot as plt  
+import numpy as np  
+import torch  
+from tqdm import tqdm
+from sklearn.metrics.pairwise import cosine_similarity
 
 class Graphics:
     """
