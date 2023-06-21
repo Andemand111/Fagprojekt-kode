@@ -1,3 +1,5 @@
+# This script is used to merge the files from the singh pipeline into one folder.
+
 import os
 old_path = "your path here for old files"
 new_path = "your path here for new files"
